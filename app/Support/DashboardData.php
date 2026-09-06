@@ -14,6 +14,9 @@ class DashboardData
     public static function resolve(DashboardWidget $widget): array
     {
         $config = $widget->config ?? [];
+        if ($widget->type === 'invoice_stat') {
+            return self::invoiceStat($widget);
+        }
         $table = Table::query()->with(['fields', 'rows', 'database'])->find((int) ($config['table_id'] ?? 0));
         if (! $table) {
             return ['value' => '—', 'detail' => 'Table missing'];
@@ -94,6 +97,32 @@ class DashboardData
             'detail' => 'Latest in '.$table->name,
             'rows' => $rows,
         ];
+    }
+
+    /**
+     * @return array{value: string, detail: string}
+     */
+    private static function invoiceStat(DashboardWidget $widget): array
+    {
+        $dashboard = $widget->dashboard()->with('workspace.invoices')->first();
+        $invoices = $dashboard?->workspace?->invoices ?? collect();
+        $open = $invoices->whereIn('status', ['issued', 'draft']);
+        $metric = $widget->config['metric'] ?? 'ttc';
+
+        return match ($metric) {
+            'unpaid' => [
+                'value' => \App\Support\Erp\Money::format((int) $open->sum('total_ttc')),
+                'detail' => $open->count().' facture(s) ouvertes',
+            ],
+            'count' => [
+                'value' => (string) $invoices->count(),
+                'detail' => 'Factures',
+            ],
+            default => [
+                'value' => \App\Support\Erp\Money::format((int) $invoices->where('status', '!=', 'cancelled')->sum('total_ttc')),
+                'detail' => 'Facturé TTC',
+            ],
+        };
     }
 
     private static function format(float $n, Field $field): string

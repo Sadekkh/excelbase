@@ -483,4 +483,70 @@ class BaserowTest extends TestCase
         $this->actingAs($user)->post('/logout')->assertRedirect('/');
         $this->get('/app')->assertRedirect('/');
     }
+
+    public function test_french_templates_and_invoices(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $owner = User::query()->where('email', 'demo@baserow.io')->first();
+        $fournil = Workspace::query()->where('name', 'Fournil du Marais')->first();
+        $this->assertNotNull($fournil);
+        $this->assertTrue($fournil->templates()->where('slug', 'boulangerie')->exists());
+        $this->assertDatabaseHas('tables', ['name' => 'Produits']);
+        $this->assertDatabaseHas('invoices', ['workspace_id' => $fournil->id]);
+        $issued = \App\Models\Invoice::query()->where('workspace_id', $fournil->id)->first();
+        $this->assertNotNull($issued->number);
+        $this->assertSame('issued', $issued->status);
+        $this->assertGreaterThan(0, $issued->total_ttc);
+
+        $this->actingAs($owner)->withSession(['workspace_id' => $fournil->id])
+            ->get(route('invoices.print', $issued))
+            ->assertOk()
+            ->assertSee('Facture')
+            ->assertSee('Hôtel des Archives')
+            ->assertSee('SIRET');
+
+        $ops = Workspace::createForUser($owner, 'Atelier test');
+        $this->actingAs($owner)->withSession(['workspace_id' => $ops->id])
+            ->postJson(route('app.templates.install'), ['slug' => 'auto-entrepreneur'])
+            ->assertOk();
+        $this->assertTrue($ops->fresh()->templates()->where('slug', 'auto-entrepreneur')->exists());
+        $this->assertDatabaseHas('tables', ['name' => 'Prestations']);
+        $this->assertTrue(\App\Models\InvoiceSetting::for($ops->fresh())->franchise_tva);
+
+        $create = $this->actingAs($owner)->withSession(['workspace_id' => $ops->id])->postJson(route('app.invoices.store'), [
+            'client_name' => 'Northwind Labs',
+            'lines' => [
+                ['description' => 'Atelier produit', 'qty' => 2, 'unit_price' => 550, 'vat' => 20],
+            ],
+            'issue' => true,
+        ]);
+        $create->assertCreated();
+        $this->assertTrue($create->json('invoice.franchise_tva'));
+        $invoice = \App\Models\Invoice::query()->where('workspace_id', $ops->id)->first();
+        $this->assertSame(0, $invoice->total_tva);
+        $this->assertSame(110000, $invoice->total_ht);
+        $this->actingAs($owner)->withSession(['workspace_id' => $ops->id])
+            ->get(route('invoices.print', $invoice))
+            ->assertSee('293 B');
+
+        $this->actingAs($owner)->withSession(['workspace_id' => $ops->id])
+            ->deleteJson(route('app.templates.destroy', 'auto-entrepreneur'))
+            ->assertOk();
+        $this->assertFalse($ops->fresh()->templates()->where('slug', 'auto-entrepreneur')->exists());
+        $this->assertDatabaseMissing('tables', ['name' => 'Prestations']);
+        $this->assertDatabaseHas('invoices', ['id' => $invoice->id]);
+
+        $this->actingAs($owner)->withSession(['workspace_id' => $ops->id])
+            ->postJson(route('app.assistant'), ['prompt' => 'table livraisons et table chauffeurs'])
+            ->assertOk()
+            ->assertJsonPath('plan.kind', 'schema');
+        $this->actingAs($owner)->withSession(['workspace_id' => $ops->id])
+            ->postJson(route('app.assistant.apply'), [
+                'kind' => 'schema',
+                'prompt' => 'table livraisons et table chauffeurs',
+            ])
+            ->assertOk();
+        $this->assertTrue($ops->fresh()->databases()->where('name', 'table livraisons et table chauffeurs')->exists()
+            || $ops->fresh()->databases()->count() >= 1);
+    }
 }

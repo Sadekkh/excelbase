@@ -17,7 +17,7 @@ class AppController extends Controller
         $user = $request->user();
         $workspace = $this->currentWorkspace($request, $user);
         $request->session()->put('workspace_id', $workspace->id);
-        $workspace->load(['databases.tables', 'members', 'plan', 'dashboards.widgets', 'automations', 'children']);
+        $workspace->load(['databases.tables', 'members', 'plan', 'dashboards.widgets', 'automations', 'children', 'templates']);
 
         return view('workspace.shell', [
             'workspace' => $workspace,

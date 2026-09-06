@@ -11,6 +11,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\FieldController;
 use App\Http\Controllers\FileController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
@@ -54,6 +56,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/app/automations', [WorkspacePanelController::class, 'currentAutomations'])->name('app.automations');
     Route::get('/app/plan', [WorkspacePanelController::class, 'currentPlan'])->name('app.plan');
     Route::get('/app/structure', [WorkspacePanelController::class, 'currentStructure'])->name('app.structure');
+    Route::get('/app/templates', [TemplateController::class, 'index'])->name('app.templates');
+    Route::post('/app/templates', [TemplateController::class, 'install'])->name('app.templates.install');
+    Route::delete('/app/templates/{slug}', [TemplateController::class, 'destroy'])->name('app.templates.destroy');
+    Route::post('/app/assistant', [TemplateController::class, 'assistant'])->name('app.assistant');
+    Route::post('/app/assistant/apply', [TemplateController::class, 'applyAssistant'])->name('app.assistant.apply');
+    Route::get('/app/invoices', [InvoiceController::class, 'index'])->name('app.invoices');
+    Route::post('/app/invoices', [InvoiceController::class, 'store'])->name('app.invoices.store');
+    Route::patch('/app/invoices/{invoice}', [InvoiceController::class, 'update'])->name('app.invoices.update');
+    Route::post('/app/invoices/settings', [InvoiceController::class, 'settings'])->name('app.invoices.settings');
+    Route::get('/invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
 
     Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
     Route::get('/workspace/{workspace}', [WorkspaceController::class, 'show'])->name('workspaces.show');

@@ -14,7 +14,7 @@ class WorkspaceShell
      */
     public static function boot(User $user, Workspace $workspace): array
     {
-        $workspace->loadMissing(['databases.tables', 'dashboards.widgets', 'plan', 'members', 'automations']);
+        $workspace->loadMissing(['databases.tables', 'dashboards.widgets', 'plan', 'members', 'automations', 'templates']);
         $surface = Access::surface($user, $workspace);
         $canBuild = Access::canBuild($user, $workspace);
         $plan = $workspace->resolvedPlan();
@@ -52,6 +52,11 @@ class WorkspaceShell
             'can_build' => $canBuild,
             'can_manage' => Access::canManage($user, $workspace),
             'can_edit' => Access::canEditData($user, $workspace),
+            'has_invoices' => $workspace->invoices()->exists() || $workspace->invoiceSettings()->exists() || $workspace->templates()->exists(),
+            'installed_templates' => $workspace->templates()->get()->map(fn ($row) => [
+                'slug' => $row->slug,
+                'name' => $row->name,
+            ])->values(),
             'unread' => $user->notifications()->whereNull('read_at')->count(),
             'databases' => $workspace->databases->map(fn ($db) => [
                 'id' => $db->id,
@@ -81,6 +86,13 @@ class WorkspaceShell
                 'automations' => route('app.automations'),
                 'plan' => route('app.plan'),
                 'structure' => route('app.structure'),
+                'templates' => route('app.templates'),
+                'templateInstall' => route('app.templates.install'),
+                'assistant' => route('app.assistant'),
+                'assistantApply' => route('app.assistant.apply'),
+                'invoices' => route('app.invoices'),
+                'invoiceStore' => route('app.invoices.store'),
+                'invoiceSettings' => route('app.invoices.settings'),
                 'surface' => route('app.surface'),
                 'workspaceStore' => route('workspaces.store'),
                 'databaseStore' => route('databases.store', $workspace),

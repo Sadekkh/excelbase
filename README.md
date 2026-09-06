@@ -2,12 +2,14 @@
 
 A Laravel + Blade SaaS recreation of [Baserow](https://baserow.io). No Vue, React, Alpine, or Livewire. Each **client is a workspace** on a **plan**, with **roles**, a **platform admin**, **dashboards**, and **automations**.
 
-The app stays on `/app`. Each workspace is its own unit: tables, roles, permissions, Build mode, and look (colors + logo). You only see a workspace you belong to. A parent can add people from its roster onto a child — that child still keeps its own seats and roles. **Use** is the spreadsheet. **Build** is per workspace.
+The app stays on `/app`. Each workspace is its own unit: tables, roles, permissions, Build mode, and look. You can install a French SME template (boulangerie, bâtiment, coffee shop, auto-entrepreneur), remove it, then keep adjusting the tables in Build. Invoices are a first-class French module (SIRET, TVA or art. 293 B, sequential numbers, print).
+
+A copy of the pre-ERP shell is tagged `snapshot-pre-erp`.
 
 ## Surfaces
 
 - **Use** — Excel-like sheets, search, filters, and dashboards. Members and viewers only see this.
-- **Build** — databases, tables, fields, automations, people, and plan. Owners, admins, and builders.
+- **Build** — templates, Build with AI, invoices, databases, fields, automations, people, and plan.
 - **Platform admin** (`/admin`) — all workspaces, users, and plan limits
 
 ## Roles
@@ -24,7 +26,7 @@ Password for all: `password`
 
 | Email | Role |
 | --- | --- |
-| `demo@baserow.io` | Platform admin + owner of Acme Inc (Premium) and the Sales child |
+| `demo@baserow.io` | Platform admin + owner of Acme Inc, Sales, and Fournil du Marais (boulangerie template) |
 | `sam@baserow.io` | Builder on Acme Inc and on Sales |
 | `maya@baserow.io` | Member on Acme Inc only — not on Sales until someone adds her from Acme |
 | `noah@harborpine.com` | Owner of Harbor & Pine (Free client workspace) |

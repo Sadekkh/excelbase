@@ -49,6 +49,21 @@ class Workspace extends Model
         return $this->hasMany(Automation::class)->orderBy('name');
     }
 
+    public function templates(): HasMany
+    {
+        return $this->hasMany(WorkspaceTemplate::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class)->latest();
+    }
+
+    public function invoiceSettings(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(InvoiceSetting::class);
+    }
+
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);

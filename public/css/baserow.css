@@ -837,3 +837,31 @@ img { max-width: 100%; }
   }
   .page-body { padding: 12px; }
 }
+
+.template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.template-card {
+  background: #fff; border: 1px solid var(--neutral-200); border-radius: var(--radius-xl);
+  padding: 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.template-card.is-on { box-shadow: inset 0 0 0 2px var(--brand, var(--blue-500)); }
+.template-card__sector { margin: 0; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--neutral-800); }
+.template-card h2 { margin: 0; font-size: 18px; }
+.invoice-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.invoice-print-body { background: #f5f5f5; }
+.invoice-sheet {
+  width: min(800px, calc(100% - 32px)); margin: 24px auto; background: #fff;
+  padding: 32px; border: 1px solid #ddd;
+}
+.invoice-sheet__head, .invoice-sheet__client { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+.invoice-sheet h1 { margin: 0; font-size: 28px; }
+.invoice-sheet__number { font-weight: 700; font-size: 18px; }
+.invoice-sheet__lines { width: 100%; border-collapse: collapse; margin: 16px 0 24px; }
+.invoice-sheet__lines th, .invoice-sheet__lines td { border-bottom: 1px solid #e6e6e7; text-align: left; padding: 8px 6px; }
+.invoice-sheet__totals { margin-left: auto; width: min(280px, 100%); }
+.invoice-sheet__totals p { display: flex; justify-content: space-between; }
+.invoice-sheet__ttc { font-size: 18px; }
+.invoice-sheet__legal { margin-top: 32px; color: #515258; font-size: 12px; }
+@media print {
+  .invoice-print-body { background: #fff; }
+  .invoice-sheet { border: 0; margin: 0; width: 100%; }
+}

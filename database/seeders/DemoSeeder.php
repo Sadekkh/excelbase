@@ -90,6 +90,23 @@ class DemoSeeder extends Seeder
         $personal = Workspace::createForUser($user, 'Personal');
         Database::createWithTable($personal, 'Notes', 'Ideas');
 
+        $fournil = Workspace::createForUser($user, 'Fournil du Marais', $premium);
+        $fournil->members()->syncWithoutDetaching([
+            $sam->id => ['role' => 'builder'],
+        ]);
+        \App\Support\Erp\TemplateInstaller::install($fournil, 'boulangerie');
+        \App\Support\Erp\InvoiceService::issue(\App\Support\Erp\InvoiceService::save($fournil, [
+            'client_name' => 'Hôtel des Archives',
+            'client_address' => "8 rue des Archives\n75004 Paris",
+            'client_email' => 'cuisine@archives-hotel.fr',
+            'client_siret' => '552 100 334 00029',
+            'source_template' => 'boulangerie',
+            'lines' => [
+                ['description' => 'Baguettes tradition — semaine 36', 'qty' => 240, 'unit_price' => 1.10, 'vat' => 5.5],
+                ['description' => 'Croissants beurre', 'qty' => 80, 'unit_price' => 1.15, 'vat' => 5.5],
+            ],
+        ]));
+
         $noah = User::query()->updateOrCreate(
             ['email' => 'noah@harborpine.com'],
             ['name' => 'Noah Hale', 'password' => 'password', 'email_verified_at' => now()]

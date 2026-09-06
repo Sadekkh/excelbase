@@ -12,6 +12,7 @@
   const drawer = document.getElementById("row-drawer");
   let current = { kind: null, tableId: null, viewId: null, dashboardId: null, search: "" };
   let searchTimer = null;
+  let assistantPlan = null;
 
   const ICONS = {
     table: "M3.5 5h17v14h-17zM3.5 9.5h17M9 5v14",
@@ -21,6 +22,9 @@
     bolt: "M13 2 4 14h7l-1 8 9-12h-7z",
     plan: "M12 3.8 14.4 9l5.6.8-4 4 1 5.6L12 16.8 6.9 19.4l1-5.6-4-4L9.6 9 12 3.8z",
     look: "M12 4.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15zM12 8v4l2.5 1.5",
+    template: "M6 4h12v16H6zM9 8h6M9 12h6M9 16h4",
+    invoice: "M7 3h10v18H7zM9 8h6M9 12h6M9 16h3",
+    spark: "M12 3l1.6 5.2L19 10l-5.4 1.8L12 17l-1.6-5.2L5 10l5.4-1.8z",
     plus: "M12 6v12M6 12h12",
     search: "M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM16 16.5 20 20.5",
     filter: "M4 6h16l-6 7.2V18l-4 2v-6.8L4 6z",
@@ -183,6 +187,9 @@
     if (isBuild()) {
       html += `<p class="nav-label">Build</p>`;
       html += navButton({ nav: "look", icon: "look", label: "Look", active: current.kind === "look" });
+      html += navButton({ nav: "templates", icon: "template", label: "Templates", active: current.kind === "templates" });
+      html += navButton({ nav: "assistant", icon: "spark", label: "Build with AI", active: current.kind === "assistant" });
+      html += navButton({ nav: "invoices", icon: "invoice", label: "Invoices", active: current.kind === "invoices" });
       html += navButton({ nav: "structure", icon: "database", label: "Structure", active: current.kind === "structure" });
       html += navButton({ nav: "automations", icon: "bolt", label: "Automations", active: current.kind === "automations" });
       if (boot.can_manage) {
@@ -217,6 +224,7 @@
           });
         });
       }
+      html += navButton({ nav: "invoices", icon: "invoice", label: "Invoices", active: current.kind === "invoices" });
       html += `<p class="nav-label">Sheets</p>`;
     }
 
@@ -466,6 +474,122 @@
     </div></div>`;
   }
 
+  function renderTemplates(data) {
+    renderPageChrome("Templates", "Install a French SME pack into this workspace. Remove it later. After install, every table stays editable in Build.");
+    stage.innerHTML = `<div class="page-body"><div class="template-grid">${(data.templates || []).map((pack) => `
+      <article class="template-card${pack.installed ? " is-on" : ""}">
+        <p class="template-card__sector">${esc(pack.sector)}</p>
+        <h2>${esc(pack.name)}</h2>
+        <p>${esc(pack.summary)}</p>
+        <p class="hint">${esc(pack.audience)} · ${pack.tables} tables</p>
+        ${pack.installed
+          ? `<button type="button" class="btn btn--ghost" data-remove-template="${esc(pack.slug)}">Remove from this workspace</button>`
+          : `<button type="button" class="btn btn--primary" data-install-template="${esc(pack.slug)}">Install</button>`}
+      </article>
+    `).join("")}</div></div>`;
+  }
+
+  function renderAssistant(plan = null) {
+    renderPageChrome("Build with AI", "Describe the module. Matching French templates are offered first; otherwise new linked tables are created here.");
+    stage.innerHTML = `<div class="page-body"><div class="split">
+      <form class="side-card" id="assistant-form">
+        <h2>What do you need?</h2>
+        <label class="field"><span>Prompt</span>
+          <textarea name="prompt" rows="5" required placeholder="Ex. suivi des livraisons et des chauffeurs, ou installer le modèle boulangerie"></textarea>
+        </label>
+        <button class="btn btn--primary" type="submit">Propose structure</button>
+      </form>
+      <div id="assistant-plan">${plan ? assistantPlanHtml(plan) : emptyState("No plan yet", "A bakery, chantier, café, or auto-entrepreneur prompt can install the ready-made pack.")}</div>
+    </div></div>`;
+  }
+
+  function assistantPlanHtml(plan) {
+    if (plan.kind === "template") {
+      return `<article class="side-card">
+        <h2>${esc(plan.name)}</h2>
+        <p>${esc(plan.message)}</p>
+        <button type="button" class="btn btn--primary" data-install-template="${esc(plan.slug)}">Install ${esc(plan.name)}</button>
+      </article>`;
+    }
+    const tables = (plan.tables || []).map((t) => `<li><strong>${esc(t.name)}</strong> — ${(t.fields || []).map(esc).join(", ")}</li>`).join("");
+    return `<article class="side-card">
+      <h2>${esc(plan.database || "New module")}</h2>
+      <p>${esc(plan.message)}</p>
+      <ul class="plain-list">${tables}</ul>
+      <button type="button" class="btn btn--primary" data-apply-assistant>Create these tables</button>
+    </article>`;
+  }
+
+  function renderInvoices(data) {
+    const settings = data.settings || {};
+    renderPageChrome("Invoices", settings.franchise_tva
+      ? "Franchise en base de TVA — mention 293 B on every issued invoice."
+      : "French invoicing: sequential numbers, TVA lines, late-payment mentions.");
+    const rows = (data.invoices || []).map((inv) => `
+      <tr>
+        <td>${esc(inv.number || "Brouillon")}</td>
+        <td>${esc(inv.client_name)}</td>
+        <td>${esc(inv.status)}</td>
+        <td>${esc(inv.total_ttc)}</td>
+        <td class="invoice-actions">
+          ${inv.status === "draft" ? `<button type="button" class="btn btn--ghost" data-invoice-action="issue" data-id="${inv.id}">Issue</button>` : ""}
+          ${inv.status === "issued" ? `<button type="button" class="btn btn--ghost" data-invoice-action="pay" data-id="${inv.id}">Mark paid</button>` : ""}
+          <a class="btn btn--ghost" href="${esc(inv.print_url)}" target="_blank" rel="noopener">Print</a>
+        </td>
+      </tr>
+    `).join("") || `<tr><td colspan="5" class="hint">No invoices yet.</td></tr>`;
+    const clientOpts = (data.clients || []).map((c) => `<option value="${c.id}" data-email="${esc(c.email || "")}" data-address="${esc(c.address || "")}" data-siret="${esc(c.siret || "")}">${esc(c.name)}</option>`).join("");
+    stage.innerHTML = `<div class="page-body"><div class="split">
+      <div>
+        <table class="data-table">
+          <thead><tr><th>N°</th><th>Client</th><th>Statut</th><th>TTC</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        ${boot.can_build ? `<form class="side-card" id="invoice-settings" style="margin-top:16px">
+          <h2>Company on the invoice</h2>
+          <label class="field"><span>Raison sociale</span><input name="legal_name" required value="${esc(settings.legal_name || boot.workspace.name)}"></label>
+          <label class="field"><span>Adresse</span><textarea name="address" rows="3">${esc(settings.address || "")}</textarea></label>
+          <label class="field"><span>SIRET</span><input name="siret" value="${esc(settings.siret || "")}"></label>
+          <label class="field"><span>N° TVA</span><input name="tva_number" value="${esc(settings.tva_number || "")}"></label>
+          <label class="check"><input type="checkbox" name="franchise_tva" value="1" ${settings.franchise_tva ? "checked" : ""}> Franchise en base de TVA (art. 293 B)</label>
+          <label class="field"><span>TVA par défaut %</span><input name="default_vat" type="number" step="0.1" value="${esc(settings.default_vat ?? 20)}"></label>
+          <button class="btn btn--primary" type="submit">Save invoice settings</button>
+        </form>` : ""}
+      </div>
+      ${data.can_manage ? `<form class="side-card" id="invoice-form">
+        <h2>New invoice</h2>
+        <label class="field"><span>Client from table</span>
+          <select id="invoice-client">${clientOpts ? `<option value="">—</option>${clientOpts}` : `<option value="">No client table yet</option>`}</select>
+        </label>
+        <label class="field"><span>Client name</span><input name="client_name" required></label>
+        <label class="field"><span>Adresse</span><textarea name="client_address" rows="2"></textarea></label>
+        <label class="field"><span>Email</span><input name="client_email" type="email"></label>
+        <label class="field"><span>SIRET</span><input name="client_siret"></label>
+        <div id="invoice-lines">
+          <label class="field"><span>Line 1</span><input data-line="description" placeholder="Désignation" required></label>
+          <div class="look-swatches">
+            <label class="field"><span>Qté</span><input data-line="qty" type="number" step="0.01" value="1"></label>
+            <label class="field"><span>PU HT</span><input data-line="unit_price" type="number" step="0.01" required></label>
+            <label class="field"><span>TVA %</span><input data-line="vat" type="number" step="0.1" value="${esc(settings.default_vat ?? 20)}"></label>
+          </div>
+        </div>
+        <label class="field"><span>Notes</span><textarea name="notes" rows="2"></textarea></label>
+        <button class="btn btn--primary" type="submit">Save draft</button>
+        <button class="btn btn--ghost" name="issue" value="1" type="submit">Issue now</button>
+      </form>` : ""}
+    </div></div>`;
+    const pick = document.getElementById("invoice-client");
+    pick?.addEventListener("change", () => {
+      const opt = pick.selectedOptions[0];
+      if (!opt || !opt.value) return;
+      const form = document.getElementById("invoice-form");
+      form.client_name.value = opt.textContent;
+      form.client_email.value = opt.dataset.email || "";
+      form.client_address.value = opt.dataset.address || "";
+      form.client_siret.value = opt.dataset.siret || "";
+    });
+  }
+
   function renderLook() {
     const w = boot.workspace;
     renderPageChrome("Look", "Accent, sidebar, and logo belong to this workspace. Switching workspaces restores that workspace’s look and its own Build mode.");
@@ -641,6 +765,12 @@
         renderLook();
       } else if (kind === "profile") {
         renderProfile();
+      } else if (kind === "templates") {
+        renderTemplates(await api(boot.urls.templates));
+      } else if (kind === "assistant") {
+        renderAssistant();
+      } else if (kind === "invoices") {
+        renderInvoices(await api(boot.urls.invoices));
       }
     } catch (err) {
       toast(err.message || "Could not open this panel");
@@ -833,6 +963,62 @@
       } catch (err) {
         toast(err.message);
       }
+      return;
+    }
+    const install = e.target.closest("[data-install-template]");
+    if (install) {
+      try {
+        const res = await api(boot.urls.templateInstall, { method: "POST", body: JSON.stringify({ slug: install.dataset.installTemplate }) });
+        if (res.boot) boot = res.boot;
+        toast(res.status || "Installed");
+        renderMode();
+        renderWorkspaceMenu();
+        renderNav();
+        await openPanel("templates");
+      } catch (err) {
+        toast(err.message);
+      }
+      return;
+    }
+    const removeTpl = e.target.closest("[data-remove-template]");
+    if (removeTpl && confirm("Remove this template’s tables and dashboards? Invoices stay.")) {
+      try {
+        const res = await api(`${boot.urls.templates}/${removeTpl.dataset.removeTemplate}`, { method: "DELETE" });
+        if (res.boot) boot = res.boot;
+        toast(res.status || "Removed");
+        renderMode();
+        renderWorkspaceMenu();
+        renderNav();
+        await openPanel("templates");
+      } catch (err) {
+        toast(err.message);
+      }
+      return;
+    }
+    const applyAi = e.target.closest("[data-apply-assistant]");
+    if (applyAi && assistantPlan) {
+      try {
+        const res = await api(boot.urls.assistantApply, { method: "POST", body: JSON.stringify(assistantPlan) });
+        if (res.boot) boot = res.boot;
+        toast(res.status || "Created");
+        renderMode();
+        renderNav();
+        if (res.table_id) await openSheet(res.table_id);
+        else await openPanel("structure");
+      } catch (err) {
+        toast(err.message);
+      }
+      return;
+    }
+    const invAct = e.target.closest("[data-invoice-action]");
+    if (invAct) {
+      try {
+        await api(`/app/invoices/${invAct.dataset.id}`, { method: "PATCH", body: JSON.stringify({ action: invAct.dataset.invoiceAction }) });
+        toast("Facture mise à jour");
+        await openPanel("invoices");
+      } catch (err) {
+        toast(err.message);
+      }
     }
   });
 
@@ -877,6 +1063,74 @@
   });
 
   document.addEventListener("submit", async (e) => {
+    const assistant = e.target.closest("#assistant-form");
+    if (assistant) {
+      e.preventDefault();
+      const prompt = assistant.prompt.value;
+      try {
+        const res = await api(boot.urls.assistant, { method: "POST", body: JSON.stringify({ prompt }) });
+        assistantPlan = { ...res.plan, prompt };
+        renderAssistant(assistantPlan);
+        assistant.prompt.value = prompt;
+      } catch (err) {
+        toast(err.message);
+      }
+      return;
+    }
+    const invoiceForm = e.target.closest("#invoice-form");
+    if (invoiceForm) {
+      e.preventDefault();
+      const issue = e.submitter?.name === "issue";
+      const lines = [{
+        description: invoiceForm.querySelector('[data-line="description"]').value,
+        qty: invoiceForm.querySelector('[data-line="qty"]').value,
+        unit_price: invoiceForm.querySelector('[data-line="unit_price"]').value,
+        vat: invoiceForm.querySelector('[data-line="vat"]').value,
+      }];
+      try {
+        const res = await api(boot.urls.invoiceStore, {
+          method: "POST",
+          body: JSON.stringify({
+            client_name: invoiceForm.client_name.value,
+            client_address: invoiceForm.client_address.value,
+            client_email: invoiceForm.client_email.value,
+            client_siret: invoiceForm.client_siret.value,
+            notes: invoiceForm.notes.value,
+            client_row_id: document.getElementById("invoice-client")?.value || null,
+            lines,
+            issue,
+          }),
+        });
+        toast(res.status || "Saved");
+        await openPanel("invoices");
+      } catch (err) {
+        toast(err.message);
+      }
+      return;
+    }
+    const invoiceSettings = e.target.closest("#invoice-settings");
+    if (invoiceSettings) {
+      e.preventDefault();
+      const fd = new FormData(invoiceSettings);
+      try {
+        const res = await api(boot.urls.invoiceSettings, {
+          method: "POST",
+          body: JSON.stringify({
+            legal_name: fd.get("legal_name"),
+            address: fd.get("address"),
+            siret: fd.get("siret"),
+            tva_number: fd.get("tva_number"),
+            franchise_tva: fd.get("franchise_tva") === "1",
+            default_vat: fd.get("default_vat"),
+          }),
+        });
+        toast(res.status || "Saved");
+        await openPanel("invoices");
+      } catch (err) {
+        toast(err.message);
+      }
+      return;
+    }
     const profile = e.target.closest("#profile-form");
     if (profile) {
       e.preventDefault();
