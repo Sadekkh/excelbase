@@ -35,15 +35,24 @@
     document.querySelectorAll(".menu").forEach((m) => {
       m.hidden = true;
     });
+    document.querySelectorAll("[data-menu][aria-expanded]").forEach((btn) => {
+      btn.setAttribute("aria-expanded", "false");
+    });
   };
 
-  function placeMenu(menu, anchor) {
-    const root = document.getElementById("menu-root") || document.body;
-    if (menu.parentElement !== root) {
-      root.appendChild(menu);
-    }
-    const rect = anchor.getBoundingClientRect();
+  function openMenu(menu, anchor) {
     menu.hidden = false;
+    if (anchor) anchor.setAttribute("aria-expanded", "true");
+    if (anchor?.dataset.anchored === "1") {
+      menu.style.position = "";
+      menu.style.top = "";
+      menu.style.left = "";
+      menu.style.minWidth = "";
+      return;
+    }
+    const root = document.getElementById("menu-root") || document.body;
+    if (menu.parentElement !== root) root.appendChild(menu);
+    const rect = anchor.getBoundingClientRect();
     menu.style.position = "fixed";
     menu.style.zIndex = "60";
     const mw = Math.max(menu.offsetWidth, 200);
@@ -64,23 +73,23 @@
     menu.style.minWidth = `${Math.max(mw, rect.width)}px`;
   }
 
-  document.addEventListener("click", (e) => {
+  function onMenuTrigger(e) {
     const opener = e.target.closest("[data-menu]");
-    if (opener) {
-      e.preventDefault();
-      e.stopPropagation();
-      const id = opener.getAttribute("data-menu");
-      const menu = document.getElementById(id);
-      if (!menu) return;
-      const wasOpen = !menu.hidden;
-      window.Baserow.closeMenus();
-      if (!wasOpen) placeMenu(menu, opener);
-      return;
-    }
-    if (!e.target.closest(".menu")) window.Baserow.closeMenus();
-  });
+    if (!opener) return false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const menu = document.getElementById(opener.getAttribute("data-menu"));
+    if (!menu) return true;
+    const wasOpen = !menu.hidden;
+    window.Baserow.closeMenus();
+    if (!wasOpen) openMenu(menu, opener);
+    return true;
+  }
 
-  window.addEventListener("resize", () => window.Baserow.closeMenus());
+  document.addEventListener("click", (e) => {
+    if (onMenuTrigger(e)) return;
+    if (!e.target.closest(".menu")) window.Baserow.closeMenus();
+  }, true);
 
   document.addEventListener("click", (e) => {
     const open = e.target.closest("[data-open-modal]");

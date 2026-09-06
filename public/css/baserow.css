@@ -195,6 +195,7 @@ img { max-width: 100%; }
   width: var(--sidebar); flex-shrink: 0;
   background: var(--sidebar-bg, var(--neutral-25)); border-right: 1px solid var(--neutral-200);
   display: flex; flex-direction: column; min-width: 0;
+  overflow: visible;
 }
 .sidebar__head {
   height: var(--topbar); padding: 0 16px;
@@ -252,8 +253,12 @@ img { max-width: 100%; }
 .tree-table span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-table:hover { background: rgba(7, 8, 16, 0.04); color: var(--neutral-1200); }
 .tree-table.is-active { background: color-mix(in srgb, var(--brand, var(--blue-500)) 14%, #fff); color: var(--brand, var(--blue-800)); font-weight: 500; }
+.sidebar__switcher { position: relative; z-index: 8; }
 .sidebar__user {
-  border-top: 1px solid var(--neutral-200); padding: 8px;
+  position: relative;
+  z-index: 9;
+  border-top: 1px solid var(--neutral-200);
+  padding: 8px;
 }
 .sidebar__user-btn {
   width: 100%;
@@ -265,6 +270,15 @@ img { max-width: 100%; }
 .sidebar__user-info { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .sidebar__user-info strong { display: block; font-size: 12px; }
 .sidebar__user-info small { display: block; color: var(--neutral-900); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+.menu--up, .menu--down {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  z-index: 12;
+  min-width: 0;
+}
+.menu--up { bottom: calc(100% + 6px); top: auto; }
+.menu--down { top: calc(100% + 6px); bottom: auto; }
 #menu-root { position: relative; z-index: 60; }
 #menu-root .menu { max-height: min(70vh, 420px); overflow: auto; }
 

@@ -15,15 +15,17 @@
             </span>
         </div>
 
-        <button type="button" class="sidebar__workspace" data-menu="workspace-menu">
-            <span class="avatar avatar--sm" id="workspace-avatar">
-                <img id="workspace-avatar-img" alt="" @if($workspace->logoUrl()) src="{{ $workspace->logoUrl() }}" @else hidden @endif>
-                <span id="workspace-avatar-letter" @if($workspace->logoUrl()) hidden @endif>{{ strtoupper(substr($workspace->name, 0, 1)) }}</span>
-            </span>
-            <span class="sidebar__workspace-name">{{ $workspace->name }}</span>
-            @include('partials.icon', ['name' => 'chevron-down', 'size' => 14])
-        </button>
-        <div class="menu menu--sidebar" id="workspace-menu" hidden></div>
+        <div class="sidebar__switcher">
+            <button type="button" class="sidebar__workspace" data-menu="workspace-menu" data-anchored="1" aria-haspopup="menu" aria-expanded="false">
+                <span class="avatar avatar--sm" id="workspace-avatar">
+                    <img id="workspace-avatar-img" alt="" @if($workspace->logoUrl()) src="{{ $workspace->logoUrl() }}" @else hidden @endif>
+                    <span id="workspace-avatar-letter" @if($workspace->logoUrl()) hidden @endif>{{ strtoupper(substr($workspace->name, 0, 1)) }}</span>
+                </span>
+                <span class="sidebar__workspace-name">{{ $workspace->name }}</span>
+                @include('partials.icon', ['name' => 'chevron-down', 'size' => 14])
+            </button>
+            <div class="menu menu--down" id="workspace-menu" hidden role="menu"></div>
+        </div>
 
         <div class="mode-switch" id="mode-switch" hidden>
             <button type="button" class="mode-switch__btn" data-surface="app">Use</button>
@@ -43,7 +45,7 @@
         </div>
 
         <div class="sidebar__user">
-            <button type="button" class="sidebar__user-btn" id="user-menu-btn" data-menu="user-menu" aria-haspopup="menu" aria-expanded="false" title="Account">
+            <button type="button" class="sidebar__user-btn" id="user-menu-btn" data-menu="user-menu" data-anchored="1" aria-haspopup="menu" aria-expanded="false" title="Account">
                 <span class="sidebar__user-info">
                     <span class="avatar avatar--sm" id="user-avatar">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
                     <span>
@@ -53,7 +55,19 @@
                 </span>
                 @include('partials.icon', ['name' => 'chevron-down', 'size' => 14])
             </button>
-            <div class="menu" id="user-menu" hidden role="menu"></div>
+            <div class="menu menu--up" id="user-menu" hidden role="menu">
+                <div class="menu__meta">{{ $user->email }}</div>
+                <button type="button" data-nav="profile">Profile</button>
+                <a href="{{ route('notifications.index') }}">Inbox</a>
+                @if ($user->is_platform_admin)
+                    <a href="{{ route('admin.index') }}">Platform admin</a>
+                @endif
+                <div class="menu__sep"></div>
+                <form method="post" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="is-danger">Log out</button>
+                </form>
+            </div>
         </div>
     </aside>
 
@@ -78,6 +92,6 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/table.js') }}"></script>
-<script src="{{ asset('js/shell.js') }}"></script>
+<script src="{{ asset('js/table.js') }}?v=menu-3"></script>
+<script src="{{ asset('js/shell.js') }}?v=menu-3"></script>
 @endpush
