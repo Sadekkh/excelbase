@@ -15,33 +15,32 @@ class WorkspaceController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
+            'parent_id' => ['nullable', 'integer'],
         ]);
-
-        $workspace = Workspace::createForUser($request->user(), $data['name']);
-
-        if ($request->expectsJson()) {
-            return response()->json($workspace);
+        $parent = null;
+        if (! empty($data['parent_id'])) {
+            $parent = $this->workspaceForUser($data['parent_id']);
+            $this->assertCanBuild($parent);
         }
 
-        return redirect()->route('workspaces.show', $workspace);
+        $workspace = Workspace::createForUser($request->user(), $data['name'], $parent?->resolvedPlan(), $parent);
+        $request->session()->put('workspace_id', $workspace->id);
+
+        if ($request->expectsJson()) {
+            return response()->json(array_merge($workspace->toArray(), [
+                'boot' => \App\Support\WorkspaceShell::boot($request->user(), $workspace),
+            ]));
+        }
+
+        return redirect()->route('app');
     }
 
     public function show(Workspace $workspace)
     {
         $workspace = $this->workspaceForUser($workspace->id);
-        $workspace->load(['databases.tables', 'members', 'plan', 'dashboards.widgets', 'automations']);
-        $user = auth()->user();
+        session(['workspace_id' => $workspace->id]);
 
-        return view('workspace.shell', [
-            'workspace' => $workspace,
-            'workspaces' => $user->workspaces,
-            'user' => $user,
-            'role' => Access::role($user, $workspace),
-            'plan' => $workspace->resolvedPlan(),
-            'canBuild' => Access::canBuild($user, $workspace),
-            'surface' => Access::surface($user, $workspace),
-            'boot' => \App\Support\WorkspaceShell::boot($user, $workspace),
-        ]);
+        return redirect()->route('app');
     }
 
     public function update(Request $request, Workspace $workspace)

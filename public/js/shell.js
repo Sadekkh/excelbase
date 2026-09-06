@@ -43,8 +43,10 @@
     return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  let mode = boot.can_build && boot.surface === "builder" ? "build" : "use";
+
   function isBuild() {
-    return boot.surface === "builder" && boot.can_build;
+    return mode === "build" && boot.can_build;
   }
 
   function closeSidebar() {
@@ -78,13 +80,23 @@
     document.querySelector(".sidebar__workspace-name").textContent = boot.workspace.name;
   }
 
+  function flattenTree(nodes, depth = 0) {
+    const out = [];
+    (nodes || []).forEach((node) => {
+      out.push({ ...node, depth });
+      flattenTree(node.children || [], depth + 1).forEach((child) => out.push(child));
+    });
+    return out;
+  }
+
   function renderWorkspaceMenu() {
     const menu = document.getElementById("workspace-menu");
     if (!menu) return;
-    menu.innerHTML = boot.workspaces.map((ws) => `
-      <button type="button" data-open-workspace="${ws.id}" class="${ws.id === boot.workspace.id ? "is-active" : ""}">${esc(ws.name)}</button>
-    `).join("") + `<div class="menu__sep"></div>
-      <button type="button" data-go="${boot.urls.home}">All workspaces</button>`;
+    const items = flattenTree(boot.tree || []).map((ws) => `
+      <button type="button" data-open-workspace="${ws.id}" class="${ws.id === boot.workspace.id ? "is-active" : ""}" style="padding-left:${12 + ws.depth * 14}px">${esc(ws.name)}</button>
+    `).join("");
+    menu.innerHTML = items + `<div class="menu__sep"></div>
+      ${boot.can_build ? `<button type="button" data-create-workspace>New workspace</button>` : ""}`;
   }
 
   function renderUserMenu() {
@@ -93,7 +105,6 @@
     menu.innerHTML = `
       <button type="button" data-go="${boot.urls.inbox}">Inbox${boot.unread ? ` (${boot.unread})` : ""}</button>
       ${boot.user.is_platform_admin ? `<button type="button" data-go="${boot.urls.admin}">Platform admin</button>` : ""}
-      <button type="button" data-go="${boot.urls.home}">All workspaces</button>
       <div class="menu__sep"></div>
       <form method="post" action="${boot.urls.logout}">
         <input type="hidden" name="_token" value="${boot.urls.csrf}">
@@ -115,14 +126,27 @@
     let html = "";
 
     if (isBuild()) {
-      html += `<p class="nav-label">Workspace</p>`;
+      html += `<p class="nav-label">Build</p>`;
       html += navButton({ nav: "structure", icon: "database", label: "Structure", active: current.kind === "structure" });
       html += navButton({ nav: "automations", icon: "bolt", label: "Automations", active: current.kind === "automations" });
       if (boot.can_manage) {
         html += navButton({ nav: "people", icon: "users", label: "People", active: current.kind === "people" });
         html += navButton({ nav: "plan", icon: "plan", label: "Plan", active: current.kind === "plan" });
       }
-      html += `<p class="nav-label">Open a sheet to edit fields</p>`;
+      html += `<p class="nav-label">Child workspaces</p>`;
+      const kids = flattenTree(boot.tree || []).filter((ws) => ws.parent_id === boot.workspace.id);
+      if (!kids.length) html += `<div class="nav-empty">No child workspaces yet.</div>`;
+      kids.forEach((ws) => {
+        html += navButton({
+          nav: "workspace",
+          icon: "database",
+          label: ws.name,
+          active: false,
+          attrs: `data-id="${ws.id}"`,
+        });
+      });
+      html += `<button type="button" class="nav-item" data-create-workspace data-parent="${boot.workspace.id}">${icon("plus")} New child workspace</button>`;
+      html += `<p class="nav-label">Sheets to edit</p>`;
     } else {
       if (boot.dashboards.length) {
         html += `<p class="nav-label">Dashboards</p>`;
@@ -266,29 +290,31 @@
   }
 
   function renderStructure(data) {
-    renderPageChrome("Structure", "Databases and tables. Open a sheet from the sidebar to add fields and views.");
-    if (!data.databases.length) {
-      stage.innerHTML = `<div class="page-body">${emptyState("No databases", "Create a database to get a first table with a Name field.")}
-        <form class="side-card" data-ajax="${boot.urls.databaseStore}" style="max-width:360px;margin:16px auto 0">
-          <label class="field"><span>Database name</span><input name="name" required placeholder="e.g. CRM"></label>
-          <button class="btn btn--primary" type="submit">Create database</button>
-        </form></div>`;
-      return;
-    }
+    renderPageChrome("Structure", "Create child workspaces, databases, and tables. Open a sheet to add fields and views.");
+    const children = (data.children || []).map((child) => `
+      <li><button type="button" class="linkish" data-nav="workspace" data-id="${child.id}">${esc(child.name)}</button></li>
+    `).join("") || "<li class='hint'>None yet</li>";
     stage.innerHTML = `<div class="page-body">
       <div class="split">
-        <div class="card-grid">${data.databases.map((db) => `
-          <article class="entity-card">
-            <div class="entity-card__icon entity-card__icon--database">${icon("database", 20)}</div>
-            <div class="entity-card__body">
-              <h3>${esc(db.name)}</h3>
-              <p>${db.tables.length} ${db.tables.length === 1 ? "table" : "tables"}</p>
-              <ul class="plain-list">${db.tables.map((t) => `
-                <li><button type="button" class="linkish" data-nav="sheet" data-id="${t.id}">${esc(t.name)}</button> · ${t.fields} fields</li>
-              `).join("")}</ul>
-            </div>
+        <div>
+          <article class="side-card" style="margin-bottom:16px">
+            <h2>Child workspaces</h2>
+            <ul class="plain-list">${children}</ul>
+            <button type="button" class="btn btn--ghost" data-create-workspace data-parent="${boot.workspace.id}">Add child workspace</button>
           </article>
-        `).join("")}</div>
+          <div class="card-grid">${(data.databases || []).map((db) => `
+            <article class="entity-card">
+              <div class="entity-card__icon entity-card__icon--database">${icon("database", 20)}</div>
+              <div class="entity-card__body">
+                <h3>${esc(db.name)}</h3>
+                <p>${db.tables.length} ${db.tables.length === 1 ? "table" : "tables"}</p>
+                <ul class="plain-list">${db.tables.map((t) => `
+                  <li><button type="button" class="linkish" data-nav="sheet" data-id="${t.id}">${esc(t.name)}</button> · ${t.fields} fields</li>
+                `).join("")}</ul>
+              </div>
+            </article>
+          `).join("") || emptyState("No databases", "Create a database to get a first table.")}</div>
+        </div>
         <form class="side-card" data-ajax="${boot.urls.databaseStore}">
           <h2>New database</h2>
           <label class="field"><span>Name</span><input name="name" required placeholder="e.g. Operations"></label>
@@ -474,26 +500,74 @@
       toast("Build is for owners, admins, and builders.");
       return;
     }
+    mode = surface === "builder" ? "build" : "use";
+    boot.surface = surface;
+    renderMode();
+    renderNav();
     try {
-      if (surface !== boot.surface) {
-        boot = await api(`/workspace/${boot.workspace.id}/surface`, {
-          method: "POST",
-          body: JSON.stringify({ surface }),
-        });
-      }
+      boot = await api(boot.urls.surface, {
+        method: "POST",
+        body: JSON.stringify({ surface }),
+      });
+      boot.surface = surface;
       renderMode();
       renderNav();
-      if (surface === "builder") {
-        await openPanel("structure");
-      } else if (current.tableId) {
-        await openSheet(current.tableId);
-      } else if (boot.start.table_id) {
-        await openSheet(boot.start.table_id);
-      } else if (boot.start.dashboard_id) {
-        await openPanel("board", boot.start.dashboard_id);
+    } catch (err) {
+      toast(err.message || "Could not save mode");
+    }
+    if (current.tableId) {
+      await openSheet(current.tableId, current.viewId, current.search);
+    } else if (mode === "build") {
+      await openPanel("structure");
+    } else if (boot.start.table_id) {
+      await openSheet(boot.start.table_id);
+    } else if (boot.start.dashboard_id) {
+      await openPanel("board", boot.start.dashboard_id);
+    }
+  }
+
+  async function openWorkspace(id) {
+    if (Number(id) === Number(boot.workspace.id)) return;
+    setBusy(true);
+    try {
+      boot = await api(boot.urls.open, {
+        method: "POST",
+        body: JSON.stringify({ workspace_id: Number(id) }),
+      });
+      mode = boot.can_build && boot.surface === "builder" ? "build" : "use";
+      current = { kind: null, tableId: null, viewId: null, dashboardId: null, search: "" };
+      renderMode();
+      renderWorkspaceMenu();
+      renderUserMenu();
+      renderNav();
+      if (window.BaserowTable?.unmount) window.BaserowTable.unmount();
+      if (boot.start.table_id) await openSheet(boot.start.table_id);
+      else if (boot.start.dashboard_id) await openPanel("board", boot.start.dashboard_id);
+      else if (isBuild()) await openPanel("structure");
+      else {
+        renderPageChrome(boot.workspace.name, "This workspace has no tables yet.");
+        stage.innerHTML = emptyState("Nothing to open", "Create a table in Build, or pick another workspace.");
       }
     } catch (err) {
-      toast(err.message || "Could not switch mode");
+      toast(err.message || "Could not open workspace");
+    } finally {
+      setBusy(false);
+      closeSidebar();
+    }
+  }
+
+  async function createWorkspace(parentId = null) {
+    const name = prompt(parentId ? "Child workspace name" : "Workspace name");
+    if (!name) return;
+    try {
+      const created = await api(boot.urls.workspaceStore, {
+        method: "POST",
+        body: JSON.stringify({ name, parent_id: parentId || undefined }),
+      });
+      toast("Workspace created");
+      await openWorkspace(created.id);
+    } catch (err) {
+      toast(err.message || "Could not create workspace");
     }
   }
 
@@ -509,10 +583,14 @@
   document.addEventListener("click", async (e) => {
     const workspaceBtn = e.target.closest("[data-open-workspace]");
     if (workspaceBtn) {
-      const ws = boot.workspaces.find((w) => Number(w.id) === Number(workspaceBtn.dataset.openWorkspace));
-      if (ws && ws.id !== boot.workspace.id) {
-        window.location.assign(ws.url);
-      }
+      window.Baserow.closeMenus();
+      await openWorkspace(workspaceBtn.dataset.openWorkspace);
+      return;
+    }
+    const createWs = e.target.closest("[data-create-workspace]");
+    if (createWs) {
+      window.Baserow.closeMenus();
+      await createWorkspace(createWs.dataset.parent || null);
       return;
     }
     const go = e.target.closest("[data-go]");
@@ -530,6 +608,7 @@
       const kind = navBtn.dataset.nav;
       if (kind === "sheet") await openSheet(navBtn.dataset.id);
       else if (kind === "board") await openPanel("board", Number(navBtn.dataset.id));
+      else if (kind === "workspace") await openWorkspace(navBtn.dataset.id);
       else await openPanel(kind);
       return;
     }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AppController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\AutomationController;
@@ -41,6 +42,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/inbox/{notification}', [NotificationController::class, 'read'])->name('notifications.read');
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/app', AppController::class)->name('app');
+    Route::get('/app/boot', [WorkspacePanelController::class, 'currentBoot'])->name('app.boot');
+    Route::post('/app/open', [AppController::class, 'open'])->name('app.open');
+    Route::post('/app/surface', [WorkspacePanelController::class, 'currentSurface'])->name('app.surface');
+    Route::get('/app/sheet/{table}', [WorkspacePanelController::class, 'currentSheet'])->name('app.sheet');
+    Route::get('/app/board/{dashboard?}', [WorkspacePanelController::class, 'currentBoard'])->name('app.board');
+    Route::get('/app/people', [WorkspacePanelController::class, 'currentPeople'])->name('app.people');
+    Route::get('/app/automations', [WorkspacePanelController::class, 'currentAutomations'])->name('app.automations');
+    Route::get('/app/plan', [WorkspacePanelController::class, 'currentPlan'])->name('app.plan');
+    Route::get('/app/structure', [WorkspacePanelController::class, 'currentStructure'])->name('app.structure');
 
     Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
     Route::get('/workspace/{workspace}', [WorkspaceController::class, 'show'])->name('workspaces.show');

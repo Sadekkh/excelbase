@@ -2,7 +2,7 @@
 @php
     $bodyClass = 'app-body';
 @endphp
-@section('title', $workspace->name.' | Baserow')
+@section('title', 'Baserow')
 @section('content')
 <div class="app shell" id="app" data-surface="{{ $surface }}">
     <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>

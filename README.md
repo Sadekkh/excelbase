@@ -2,7 +2,7 @@
 
 A Laravel + Blade SaaS recreation of [Baserow](https://baserow.io). No Vue, React, Alpine, or Livewire. Each **client is a workspace** on a **plan**, with **roles**, a **platform admin**, **dashboards**, and **automations**.
 
-The workspace stays on one URL. A sidebar switches **Use** and **Build**. Use is a spreadsheet: search, filter, and edit cells. Build is for structure, automations, people, and plan.
+The app stays on `/app`. Workspaces are a tree you switch in the sidebar — you can belong to several, and a workspace can have children. **Use** is the spreadsheet. **Build** stays on the same sheet and turns on structure tools.
 
 ## Surfaces
 

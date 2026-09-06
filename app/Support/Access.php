@@ -14,10 +14,28 @@ class Access
         if (! $user) {
             return null;
         }
-        if ($workspace->relationLoaded('members')) {
-            $member = $workspace->members->firstWhere('id', $user->id);
 
-            return $member?->pivot?->role;
+        $current = $workspace;
+        $guard = 0;
+        while ($current && $guard++ < 24) {
+            $role = self::directRole($user, $current);
+            if ($role) {
+                return $role;
+            }
+            $current->loadMissing('parent.members');
+            $current = $current->parent;
+        }
+
+        return null;
+    }
+
+    public static function directRole(?User $user, Workspace $workspace): ?string
+    {
+        if (! $user) {
+            return null;
+        }
+        if ($workspace->relationLoaded('members')) {
+            return $workspace->members->firstWhere('id', $user->id)?->pivot?->role;
         }
 
         return $workspace->members()->where('users.id', $user->id)->first()?->pivot?->role;

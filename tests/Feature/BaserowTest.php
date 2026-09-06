@@ -26,11 +26,11 @@ class BaserowTest extends TestCase
     {
         $this->seed(DemoSeeder::class);
 
-        $this->post('/demo')->assertRedirect('/dashboard');
-        $this->get('/dashboard')
+        $this->post('/demo')->assertRedirect('/app');
+        $this->get('/app')
             ->assertOk()
             ->assertSee('Acme Inc')
-            ->assertSee('All workspaces');
+            ->assertSee('Use');
     }
 
     public function test_guest_cannot_open_dashboard(): void
@@ -45,7 +45,7 @@ class BaserowTest extends TestCase
             'email' => 'jordan@example.com',
             'password' => 'password12',
             'password_confirmation' => 'password12',
-        ])->assertRedirect('/dashboard');
+        ])->assertRedirect('/app');
 
         $this->assertDatabaseHas('users', ['email' => 'jordan@example.com']);
         $this->assertDatabaseHas('workspaces', ['name' => "Jordan Lee's workspace"]);
@@ -126,6 +126,41 @@ class BaserowTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_nested_workspaces_and_build_mode(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $owner = User::query()->where('email', 'demo@baserow.io')->first();
+        $member = User::query()->where('email', 'maya@baserow.io')->first();
+        $acme = Workspace::query()->where('name', 'Acme Inc')->first();
+        $sales = Workspace::query()->where('name', 'Sales')->first();
+        $this->assertNotNull($sales);
+        $this->assertSame($acme->id, $sales->parent_id);
+
+        $this->actingAs($member)->get(route('workspaces.show', $sales))->assertRedirect(route('app'));
+        $this->actingAs($member)->withSession(['workspace_id' => $sales->id])->getJson(route('app.boot'))
+            ->assertOk()
+            ->assertJsonPath('workspace.name', 'Sales')
+            ->assertJsonPath('can_build', false);
+
+        $this->actingAs($owner)->withSession(['workspace_id' => $acme->id])
+            ->postJson(route('app.surface'), ['surface' => 'builder'])
+            ->assertOk()
+            ->assertJsonPath('surface', 'builder')
+            ->assertJsonPath('can_build', true);
+
+        $table = Table::query()->where('name', 'Clients')->first();
+        $this->actingAs($owner)->withSession(['workspace_id' => $acme->id, 'surface' => 'builder'])
+            ->getJson(route('app.sheet', $table))
+            ->assertOk()
+            ->assertJsonPath('bootstrap.canBuild', true);
+
+        $this->actingAs($owner)->withSession(['workspace_id' => $acme->id])->postJson(route('workspaces.store'), [
+            'name' => 'Marketing',
+            'parent_id' => $acme->id,
+        ])->assertOk()->assertJsonPath('name', 'Marketing');
+        $this->assertDatabaseHas('workspaces', ['name' => 'Marketing', 'parent_id' => $acme->id]);
+    }
+
     public function test_row_query_filters_and_sorts(): void
     {
         $this->seed(DemoSeeder::class);
@@ -190,10 +225,11 @@ class BaserowTest extends TestCase
         $this->actingAs($member)->get(route('admin.index'))->assertForbidden();
 
         $this->actingAs($member)->get(route('workspaces.show', $workspace))
+            ->assertRedirect(route('app'));
+        $this->actingAs($member)->get(route('app'))
             ->assertOk()
-            ->assertSee('Use')
             ->assertSee('Acme Inc')
-            ->assertSee('CRM overview');
+            ->assertSee('Use');
 
         $this->actingAs($member)->getJson(route('workspaces.panel.sheet', [$workspace, $table]))
             ->assertOk()

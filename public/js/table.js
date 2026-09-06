@@ -1015,6 +1015,9 @@ window.BaserowTable = (() => {
   }
 
   document.addEventListener("click", async (e) => {
+    if (e.target.closest("#mode-switch") || e.target.closest("[data-open-workspace]") || e.target.closest("[data-create-workspace]")) {
+      return;
+    }
     if (!state) return;
     const t = e.target.closest("[data-add-field]");
     if (t) { if (canBuild) fieldModal(); return; }

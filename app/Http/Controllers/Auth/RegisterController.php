@@ -33,6 +33,8 @@ class RegisterController extends Controller
         $workspace = Workspace::createForUser($user, $user->name."'s workspace");
         Database::createWithTable($workspace, 'Database', 'Table');
 
-        return redirect()->route('dashboard');
+        $request->session()->put('workspace_id', $workspace->id);
+
+        return redirect()->route('app');
     }
 }

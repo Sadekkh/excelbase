@@ -71,6 +71,9 @@ class DemoSeeder extends Seeder
 
         $this->seedWorkspaceExperience($workspace, $clients, $deals, $tasks);
 
+        $sales = Workspace::createForUser($user, 'Sales', $premium, $workspace->fresh('members'));
+        Database::createWithTable($sales, 'Pipeline', 'Opportunities');
+
         $personal = Workspace::createForUser($user, 'Personal');
         Database::createWithTable($personal, 'Notes', 'Ideas');
 

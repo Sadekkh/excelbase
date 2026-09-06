@@ -25,11 +25,13 @@ class WorkspaceShell
             'workspace' => [
                 'id' => $workspace->id,
                 'name' => $workspace->name,
+                'parent_id' => $workspace->parent_id,
             ],
+            'tree' => Workspace::treeFor($user),
             'workspaces' => $user->workspaces()->orderBy('name')->get()->map(fn ($ws) => [
                 'id' => $ws->id,
                 'name' => $ws->name,
-                'url' => route('workspaces.show', $ws),
+                'parent_id' => $ws->parent_id,
             ])->values(),
             'user' => [
                 'id' => $user->id,
@@ -68,20 +70,22 @@ class WorkspaceShell
                 'dashboard_id' => $board?->id,
             ],
             'urls' => [
-                'boot' => route('workspaces.panel.boot', $workspace),
-                'sheet' => url('/workspace/'.$workspace->id.'/panel/sheet'),
-                'board' => url('/workspace/'.$workspace->id.'/panel/board'),
-                'people' => route('workspaces.panel.people', $workspace),
-                'automations' => route('workspaces.panel.automations', $workspace),
-                'plan' => route('workspaces.panel.plan', $workspace),
-                'structure' => route('workspaces.panel.structure', $workspace),
-                'surface' => route('surface.switch'),
+                'app' => route('app'),
+                'boot' => route('app.boot'),
+                'open' => route('app.open'),
+                'sheet' => url('/app/sheet'),
+                'board' => url('/app/board'),
+                'people' => route('app.people'),
+                'automations' => route('app.automations'),
+                'plan' => route('app.plan'),
+                'structure' => route('app.structure'),
+                'surface' => route('app.surface'),
+                'workspaceStore' => route('workspaces.store'),
                 'databaseStore' => route('databases.store', $workspace),
                 'memberStore' => route('members.store', $workspace),
                 'automationStore' => route('automations.store', $workspace),
                 'planChoose' => route('workspaces.plan', $workspace),
                 'logout' => route('logout'),
-                'home' => route('dashboard'),
                 'inbox' => route('notifications.index'),
                 'admin' => route('admin.index'),
                 'csrf' => csrf_token(),
@@ -225,8 +229,14 @@ class WorkspaceShell
     {
         $workspace->loadMissing(['databases.tables']);
 
+        $workspace->loadMissing('children');
+
         return [
             'kind' => 'structure',
+            'children' => $workspace->children->map(fn ($child) => [
+                'id' => $child->id,
+                'name' => $child->name,
+            ])->values(),
             'databases' => $workspace->databases->map(fn ($db) => [
                 'id' => $db->id,
                 'name' => $db->name,

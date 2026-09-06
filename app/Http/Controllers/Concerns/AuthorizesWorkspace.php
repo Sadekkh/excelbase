@@ -16,10 +16,8 @@ trait AuthorizesWorkspace
     protected function workspaceForUser(int|string $id): Workspace
     {
         $user = auth()->user();
-        $workspace = $user->is_platform_admin
-            ? Workspace::query()->with(['plan', 'members'])->find($id)
-            : $user->workspaces()->with(['plan', 'members'])->where('workspaces.id', $id)->first();
-        if (! $workspace) {
+        $workspace = Workspace::query()->with(['plan', 'members', 'parent.members'])->find($id);
+        if (! $workspace || ! Access::canView($user, $workspace)) {
             throw new AuthorizationException;
         }
 
