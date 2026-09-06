@@ -15,12 +15,16 @@ class ViewController extends Controller
     public function store(Request $request, Table $table)
     {
         $this->tableForUser($table);
+        $workspace = $this->workspaceOfTable($table);
+        $this->assertCanBuild($workspace);
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:120'],
             'type' => ['required', Rule::in(['grid', 'gallery', 'kanban', 'form', 'calendar', 'timeline', 'survey', 'graph'])],
             'kanban_field_id' => ['nullable', 'integer'],
             'is_personal' => ['sometimes', 'boolean'],
         ]);
+
+        abort_unless($workspace->resolvedPlan()->allowsView($data['type']), 422, 'Upgrade your plan to use this view.');
 
         $type = $data['type'] === 'survey' ? 'form' : $data['type'];
 
@@ -56,6 +60,7 @@ class ViewController extends Controller
     public function update(Request $request, View $view)
     {
         $this->viewForUser($view);
+        $this->assertCanBuild($this->workspaceOfTable($view->table));
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
             'filters' => ['sometimes', 'array'],

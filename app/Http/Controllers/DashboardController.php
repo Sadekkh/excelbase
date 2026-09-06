@@ -10,11 +10,12 @@ class DashboardController extends Controller
 
     public function __invoke()
     {
-        $workspaces = auth()->user()->workspaces()->with(['databases.tables', 'members'])->get();
+        $workspaces = auth()->user()->workspaces()->with(['databases.tables', 'members', 'plan'])->get();
 
         return view('dashboard.index', [
             'workspaces' => $workspaces,
             'user' => auth()->user(),
+            'unread' => auth()->user()->notifications()->whereNull('read_at')->count(),
         ]);
     }
 }

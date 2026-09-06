@@ -1,15 +1,21 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\AutomationController;
+use App\Http\Controllers\BoardController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\FieldController;
 use App\Http\Controllers\FileController;
+use App\Http\Controllers\MemberController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\PublicShareController;
 use App\Http\Controllers\RowController;
+use App\Http\Controllers\SurfaceController;
 use App\Http\Controllers\TableController;
 use App\Http\Controllers\ViewController;
 use App\Http\Controllers\WorkspaceController;
@@ -29,6 +35,9 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
+    Route::post('/surface', [SurfaceController::class, 'switch'])->name('surface.switch');
+    Route::get('/inbox', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/inbox/{notification}', [NotificationController::class, 'read'])->name('notifications.read');
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
@@ -36,6 +45,26 @@ Route::middleware('auth')->group(function () {
     Route::get('/workspace/{workspace}', [WorkspaceController::class, 'show'])->name('workspaces.show');
     Route::patch('/workspace/{workspace}', [WorkspaceController::class, 'update'])->name('workspaces.update');
     Route::delete('/workspace/{workspace}', [WorkspaceController::class, 'destroy'])->name('workspaces.destroy');
+    Route::get('/workspace/{workspace}/app', [SurfaceController::class, 'app'])->name('workspaces.app');
+    Route::get('/workspace/{workspace}/plan', [SurfaceController::class, 'billing'])->name('workspaces.billing');
+    Route::post('/workspace/{workspace}/plan', [SurfaceController::class, 'choosePlan'])->name('workspaces.plan');
+
+    Route::get('/workspace/{workspace}/people', [MemberController::class, 'index'])->name('members.index');
+    Route::post('/workspace/{workspace}/people', [MemberController::class, 'store'])->name('members.store');
+    Route::patch('/workspace/{workspace}/people/{user}', [MemberController::class, 'update'])->name('members.update');
+    Route::delete('/workspace/{workspace}/people/{user}', [MemberController::class, 'destroy'])->name('members.destroy');
+
+    Route::get('/workspace/{workspace}/dashboards', [BoardController::class, 'index'])->name('dashboards.index');
+    Route::post('/workspace/{workspace}/dashboards', [BoardController::class, 'store'])->name('dashboards.store');
+    Route::get('/workspace/{workspace}/dashboards/{dashboard}', [BoardController::class, 'show'])->name('dashboards.show');
+    Route::delete('/workspace/{workspace}/dashboards/{dashboard}', [BoardController::class, 'destroy'])->name('dashboards.destroy');
+    Route::post('/workspace/{workspace}/dashboards/{dashboard}/widgets', [BoardController::class, 'storeWidget'])->name('dashboards.widgets.store');
+    Route::delete('/workspace/{workspace}/dashboards/{dashboard}/widgets/{widget}', [BoardController::class, 'destroyWidget'])->name('dashboards.widgets.destroy');
+
+    Route::get('/workspace/{workspace}/automations', [AutomationController::class, 'index'])->name('automations.index');
+    Route::post('/workspace/{workspace}/automations', [AutomationController::class, 'store'])->name('automations.store');
+    Route::patch('/workspace/{workspace}/automations/{automation}', [AutomationController::class, 'update'])->name('automations.update');
+    Route::delete('/workspace/{workspace}/automations/{automation}', [AutomationController::class, 'destroy'])->name('automations.destroy');
 
     Route::post('/workspace/{workspace}/databases', [DatabaseController::class, 'store'])->name('databases.store');
     Route::get('/database/{database}', [DatabaseController::class, 'show'])->name('databases.show');
@@ -70,4 +99,14 @@ Route::middleware('auth')->group(function () {
     Route::patch('/views/{view}', [ViewController::class, 'update'])->name('views.update');
     Route::delete('/views/{view}', [ViewController::class, 'destroy'])->name('views.destroy');
     Route::post('/views/{view}/duplicate', [ViewController::class, 'duplicate'])->name('views.duplicate');
+
+    Route::middleware('platform')->prefix('admin')->group(function () {
+        Route::get('/', [AdminController::class, 'index'])->name('admin.index');
+        Route::get('/workspaces', [AdminController::class, 'workspaces'])->name('admin.workspaces');
+        Route::post('/workspaces/{workspace}/plan', [AdminController::class, 'assignPlan'])->name('admin.workspaces.plan');
+        Route::get('/users', [AdminController::class, 'users'])->name('admin.users');
+        Route::post('/users/{user}/admin', [AdminController::class, 'toggleAdmin'])->name('admin.users.toggle');
+        Route::get('/plans', [AdminController::class, 'plans'])->name('admin.plans');
+        Route::patch('/plans/{plan}', [AdminController::class, 'updatePlan'])->name('admin.plans.update');
+    });
 });

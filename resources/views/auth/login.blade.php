@@ -37,7 +37,11 @@
         </form>
 
         <p class="auth__alt">Don’t have an account? <a href="{{ route('register') }}">Create a new account</a></p>
-        <p class="auth__hint">Demo login is prefilled: <strong>demo@baserow.io</strong> / <strong>password</strong></p>
+        <p class="auth__hint">
+            <strong>demo@baserow.io</strong> owner + platform admin ·
+            <strong>sam@baserow.io</strong> builder ·
+            <strong>maya@baserow.io</strong> member (user surface). Password for all: <strong>password</strong>
+        </p>
     </div>
     <aside class="auth__aside">
         <div>

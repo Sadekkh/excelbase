@@ -10,7 +10,7 @@
      data-view-type="{{ $view->type }}">
     <aside class="sidebar" id="sidebar">
         <div class="sidebar__head">
-            <a class="sidebar__logo" href="{{ route('dashboard') }}">
+            <a class="sidebar__logo" href="{{ ($surface ?? 'builder') === 'app' ? route('workspaces.app', $workspace) : route('workspaces.show', $workspace) }}">
                 @include('partials.logo', ['size' => 18])
                 <span>Baserow</span>
             </a>
@@ -26,7 +26,15 @@
                 <a href="{{ route('workspaces.show', $ws) }}" class="{{ $ws->id === $workspace->id ? 'is-active' : '' }}">{{ $ws->name }}</a>
             @endforeach
             <div class="menu__sep"></div>
-            <a href="{{ route('dashboard') }}">All workspaces</a>
+                <a href="{{ route('dashboards.index', $workspace) }}">Dashboards</a>
+                @if (($showBuilderTools ?? false))
+                    <a href="{{ route('automations.index', $workspace) }}">Automations</a>
+                    <a href="{{ route('members.index', $workspace) }}">People</a>
+                @endif
+                <a href="{{ route('dashboard') }}">All workspaces</a>
+                @if (auth()->user()->is_platform_admin)
+                    <a href="{{ route('admin.index') }}">Platform admin</a>
+                @endif
         </div>
 
         <div class="sidebar__scroll">
@@ -52,6 +60,7 @@
                                     @include('partials.icon', ['name' => 'table', 'size' => 14])
                                     <span>{{ $tbl->name }}</span>
                                 </a>
+                                @if ($showBuilderTools ?? false)
                                 <button type="button" class="icon-btn icon-btn--tiny" data-menu="tbl-menu-{{ $tbl->id }}">
                                     @include('partials.icon', ['name' => 'more', 'size' => 14])
                                 </button>
@@ -61,10 +70,12 @@
                                     <a href="{{ route('tables.export', $tbl) }}">Export CSV</a>
                                     <button type="button" class="is-danger" data-delete="table" data-id="{{ $tbl->id }}">Delete</button>
                                 </div>
+                                @endif
                             </li>
                         @endforeach
                     </ul>
                 </details>
+                @if ($showBuilderTools ?? false)
                 <button type="button" class="icon-btn icon-btn--tiny tree-db__more" data-menu="db-menu-{{ $db->id }}">
                     @include('partials.icon', ['name' => 'more', 'size' => 14])
                 </button>
@@ -73,6 +84,7 @@
                     <button type="button" data-create-table="{{ $db->id }}">Create table</button>
                     <button type="button" class="is-danger" data-delete="database" data-id="{{ $db->id }}">Delete</button>
                 </div>
+                @endif
                 </div>
             @endforeach
         </div>
@@ -109,6 +121,7 @@
                         @endif
                     </a>
                 @endforeach
+                @if ($showBuilderTools ?? false)
                 <button type="button" class="view-tab view-tab--add" data-menu="add-view">
                     @include('partials.icon', ['name' => 'plus', 'size' => 14])
                 </button>
@@ -124,11 +137,21 @@
                         <input type="checkbox" id="create-personal"> Personal view (only I can see this)
                     </label>
                 </div>
+                @endif
             </div>
             <div class="views-bar__meta">
                 <span>{{ $database->name }}</span>
                 <span class="dot">·</span>
                 <strong>{{ $table->name }}</strong>
+                @if (!empty($plan))<span class="dot">·</span><span>{{ $plan->name }}</span>@endif
+                @if (($canBuild ?? false))
+                    <form method="post" action="{{ route('surface.switch') }}" style="display:inline">
+                        @csrf
+                        <input type="hidden" name="workspace_id" value="{{ $workspace->id }}">
+                        <input type="hidden" name="surface" value="{{ ($surface ?? 'builder') === 'app' ? 'builder' : 'app' }}">
+                        <button type="submit" class="btn btn--ghost" style="height:28px">{{ ($surface ?? 'builder') === 'app' ? 'Builder' : 'Use' }}</button>
+                    </form>
+                @endif
             </div>
         </div>
 

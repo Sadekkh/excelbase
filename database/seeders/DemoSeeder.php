@@ -2,8 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Models\Automation;
+use App\Models\Dashboard;
+use App\Models\DashboardWidget;
 use App\Models\Database;
 use App\Models\Field;
+use App\Models\Plan;
 use App\Models\Row;
 use App\Models\RowComment;
 use App\Models\Table;
@@ -18,20 +22,24 @@ class DemoSeeder extends Seeder
 {
     public function run(): void
     {
+        Plan::ensureDefaults();
+        $premium = Plan::query()->where('slug', 'premium')->first();
         $user = User::query()->updateOrCreate(
             ['email' => 'demo@baserow.io'],
             [
                 'name' => 'Alex Rivera',
                 'password' => 'password',
                 'email_verified_at' => now(),
+                'is_platform_admin' => true,
             ]
         );
+        $user->update(['is_platform_admin' => true]);
 
         if ($user->workspaces()->exists()) {
             return;
         }
 
-        $workspace = Workspace::createForUser($user, 'Acme Inc');
+        $workspace = Workspace::createForUser($user, 'Acme Inc', $premium);
         $crm = Database::create([
             'workspace_id' => $workspace->id,
             'name' => 'CRM',
@@ -44,12 +52,80 @@ class DemoSeeder extends Seeder
         ]);
 
         $clients = $this->clientsTable($crm, $user)->load(['fields', 'rows']);
-        $this->dealsTable($crm, $clients);
-        $this->tasksTable($crm, $user);
+        $deals = $this->dealsTable($crm, $clients);
+        $tasks = $this->tasksTable($crm, $user);
         $this->featuresTable($product);
+
+        $sam = User::query()->updateOrCreate(
+            ['email' => 'sam@baserow.io'],
+            ['name' => 'Sam Chen', 'password' => 'password', 'email_verified_at' => now()]
+        );
+        $maya = User::query()->updateOrCreate(
+            ['email' => 'maya@baserow.io'],
+            ['name' => 'Maya Chen', 'password' => 'password', 'email_verified_at' => now()]
+        );
+        $workspace->members()->syncWithoutDetaching([
+            $sam->id => ['role' => 'builder'],
+            $maya->id => ['role' => 'member'],
+        ]);
+
+        $this->seedWorkspaceExperience($workspace, $clients, $deals, $tasks);
 
         $personal = Workspace::createForUser($user, 'Personal');
         Database::createWithTable($personal, 'Notes', 'Ideas');
+
+        $noah = User::query()->updateOrCreate(
+            ['email' => 'noah@harborpine.com'],
+            ['name' => 'Noah Hale', 'password' => 'password', 'email_verified_at' => now()]
+        );
+        $harbor = Workspace::createForUser($noah, 'Harbor & Pine', Plan::free());
+        Database::createWithTable($harbor, 'Operations', 'Jobs');
+    }
+
+    private function seedWorkspaceExperience(Workspace $workspace, Table $clients, Table $deals, Table $tasks): void
+    {
+        $board = Dashboard::create([
+            'workspace_id' => $workspace->id,
+            'name' => 'CRM overview',
+            'description' => 'What the Acme team uses every morning — not the table designer.',
+            'is_default' => true,
+            'order' => 1,
+        ]);
+        $status = $clients->fields()->where('name', 'Status')->first();
+        $amount = $deals->fields()->where('name', 'Amount')->first();
+        $stage = $deals->fields()->where('name', 'Stage')->first();
+        DashboardWidget::create(['dashboard_id' => $board->id, 'type' => 'stat', 'title' => 'Clients', 'config' => ['table_id' => $clients->id, 'metric' => 'count'], 'order' => 1]);
+        DashboardWidget::create(['dashboard_id' => $board->id, 'type' => 'stat', 'title' => 'Pipeline', 'config' => ['table_id' => $deals->id, 'field_id' => $amount?->id, 'metric' => 'sum'], 'order' => 2]);
+        DashboardWidget::create(['dashboard_id' => $board->id, 'type' => 'chart', 'title' => 'Deals by stage', 'config' => ['table_id' => $deals->id, 'field_id' => $stage?->id], 'order' => 3]);
+        DashboardWidget::create(['dashboard_id' => $board->id, 'type' => 'list', 'title' => 'Recent tasks', 'config' => ['table_id' => $tasks->id], 'order' => 4]);
+
+        Automation::create([
+            'workspace_id' => $workspace->id,
+            'table_id' => $deals->id,
+            'name' => 'Notify builders of new deals',
+            'enabled' => true,
+            'trigger' => 'row_created',
+            'trigger_config' => [],
+            'action' => 'notify',
+            'action_config' => [
+                'role' => 'builders',
+                'message' => 'A new deal landed in the CRM.',
+            ],
+        ]);
+        Automation::create([
+            'workspace_id' => $workspace->id,
+            'table_id' => $tasks->id,
+            'name' => 'Log a follow-up when a task is created',
+            'enabled' => true,
+            'trigger' => 'row_created',
+            'trigger_config' => [],
+            'action' => 'notify',
+            'action_config' => [
+                'role' => 'everyone',
+                'message' => 'A task was added.',
+            ],
+        ]);
+        unset($status);
     }
 
     private function clientsTable(Database $database, User $user): Table

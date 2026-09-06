@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesWorkspace;
 use App\Models\Workspace;
+use App\Support\Access;
 use Illuminate\Http\Request;
 
 class WorkspaceController extends Controller
@@ -28,12 +29,18 @@ class WorkspaceController extends Controller
     public function show(Workspace $workspace)
     {
         $workspace = $this->workspaceForUser($workspace->id);
-        $workspace->load(['databases.tables', 'members']);
+        $workspace->load(['databases.tables', 'members', 'plan', 'dashboards']);
+        if (Access::surface(auth()->user(), $workspace) === 'app') {
+            return redirect()->route('workspaces.app', $workspace);
+        }
 
         return view('workspace.show', [
             'workspace' => $workspace,
             'workspaces' => auth()->user()->workspaces,
             'user' => auth()->user(),
+            'role' => Access::role(auth()->user(), $workspace),
+            'plan' => $workspace->resolvedPlan(),
+            'canBuild' => Access::canBuild(auth()->user(), $workspace),
         ]);
     }
 

@@ -14,6 +14,7 @@ class CommentController extends Controller
     public function index(Row $row)
     {
         $this->rowForUser($row);
+        $this->assertCanEdit($this->workspaceOfTable($row->table));
 
         return response()->json([
             'comments' => $row->comments()->with('user')->latest()->get()->map(fn (RowComment $c) => [
@@ -28,6 +29,7 @@ class CommentController extends Controller
     public function store(Request $request, Row $row)
     {
         $this->rowForUser($row);
+        $this->assertCanEdit($this->workspaceOfTable($row->table));
         $data = $request->validate([
             'body' => ['required', 'string', 'max:2000'],
         ]);

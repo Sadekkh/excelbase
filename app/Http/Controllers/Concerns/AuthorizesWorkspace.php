@@ -8,18 +8,50 @@ use App\Models\Row;
 use App\Models\Table;
 use App\Models\View;
 use App\Models\Workspace;
+use App\Support\Access;
 use Illuminate\Auth\Access\AuthorizationException;
 
 trait AuthorizesWorkspace
 {
     protected function workspaceForUser(int|string $id): Workspace
     {
-        $workspace = auth()->user()->workspaces()->where('workspaces.id', $id)->first();
+        $user = auth()->user();
+        $workspace = $user->is_platform_admin
+            ? Workspace::query()->with(['plan', 'members'])->find($id)
+            : $user->workspaces()->with(['plan', 'members'])->where('workspaces.id', $id)->first();
         if (! $workspace) {
             throw new AuthorizationException;
         }
 
         return $workspace;
+    }
+
+    protected function assertCanBuild(Workspace $workspace): void
+    {
+        if (! Access::canBuild(auth()->user(), $workspace)) {
+            throw new AuthorizationException;
+        }
+    }
+
+    protected function assertCanEdit(Workspace $workspace): void
+    {
+        if (! Access::canEditData(auth()->user(), $workspace)) {
+            throw new AuthorizationException;
+        }
+    }
+
+    protected function assertCanManage(Workspace $workspace): void
+    {
+        if (! Access::canManage(auth()->user(), $workspace)) {
+            throw new AuthorizationException;
+        }
+    }
+
+    protected function workspaceOfTable(Table $table): Workspace
+    {
+        $table->loadMissing('database.workspace.plan', 'database.workspace.members');
+
+        return $this->workspaceForUser($table->database->workspace_id);
     }
 
     protected function databaseForUser(Database $database): Database

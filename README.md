@@ -1,25 +1,31 @@
 # Baserow
 
-A Laravel + Blade recreation of [Baserow](https://baserow.io) — the open-source Airtable alternative. No Vue, React, Alpine, or Livewire. The UI is server-rendered Blade with vanilla JavaScript, styled to Baserow’s design tokens (Inter, `#5190ef`, 33px grid rows, 51px chrome).
+A Laravel + Blade SaaS recreation of [Baserow](https://baserow.io). No Vue, React, Alpine, or Livewire. Each **client is a workspace** on a **plan**, with **roles**, a **platform admin**, **dashboards**, and **automations**. Builders create the structure; members only use it.
 
-This slice includes the **Premium** database features from [baserow.io/pricing](https://baserow.io/pricing): extra views, formula and AI fields, row comments, personal views, extra export formats, survey forms, and branding removal.
+## Surfaces
 
-It does **not** clone the full Baserow cloud product (application builder, automations, dashboards, SSO, realtime collaboration, or hosted LLM providers).
+- **Builder** — databases, tables, fields, views, automations, dashboards, people, and plan
+- **User (app)** — published dashboards and tables only; no structure editing
+- **Platform admin** (`/admin`) — all workspaces, users, and plan limits
 
-## What you can do
+## Roles
 
-- **Accounts** — sign in, sign up, demo workspace
-- **Workspaces** — create, rename, delete; switch from the sidebar
-- **Databases & tables** — create, rename, delete, duplicate tables
-- **Fields** — text, long text, number, rating, boolean, date, single/multiple select, URL, email, phone, link to table, lookup, count, formula, AI, file, created on, last modified
-- **Rows** — inline grid edit, expand drawer, bulk select, duplicate, delete, arrow-key navigation, copy/paste, row comments
-- **Views** — grid, gallery, kanban, calendar, timeline, graph, form, survey
-- **Premium view tools** — personal views, row coloring, extra-tall row height, hide Baserow branding on forms
-- **Grid tools** — filter, sort, group, hide fields, row height, column resize, field summaries, CSV import
-- **Export** — CSV, JSON, XML, Excel (tab-separated)
-- **Sharing** — public grid/gallery/kanban/timeline/graph links and public forms that write into the table
+Owner, Admin, Builder, Member, Viewer. Members and viewers always land on the user surface.
 
-The demo workspace (`Acme Inc`) ships with a CRM (Clients, Deals, Tasks) and a Product database. Deals include formula, AI, lookup, and count fields. Tasks include a timeline, a branded-off public form, a survey, and row comments. Clients include a personal “My leads” view and a graph.
+## Plans
+
+Free, Premium, and Advanced (local billing — choosing a plan changes limits immediately). Premium unlocks kanban/calendar/timeline/graph/survey, formula/AI/lookup fields, comments, extra exports, more automations and dashboards.
+
+## Demo accounts
+
+Password for all: `password`
+
+| Email | Role |
+| --- | --- |
+| `demo@baserow.io` | Platform admin + owner of Acme Inc (Premium) |
+| `sam@baserow.io` | Builder on Acme Inc |
+| `maya@baserow.io` | Member on Acme Inc (user surface) |
+| `noah@harborpine.com` | Owner of Harbor & Pine (Free client workspace) |
 
 ## Run locally
 
@@ -37,10 +43,6 @@ php artisan serve --host=127.0.0.1 --port=43127
 
 Open [http://127.0.0.1:43127](http://127.0.0.1:43127).
 
-**Demo account:** `demo@baserow.io` / `password`
-
-Or click **Continue with the demo workspace** on the sign-in page.
-
 ## Tests
 
 ```bash
@@ -50,5 +52,5 @@ php artisan test
 ## Stack
 
 - Laravel 13, Blade, SQLite
-- Session auth
-- Vanilla JS (`public/js`) and CSS (`public/css/baserow.css`) — no frontend framework and no Vite build step for the UI
+- Session auth and workspace membership
+- Vanilla JS and CSS — no frontend framework

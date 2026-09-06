@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\AuthorizesWorkspace;
 use App\Http\Controllers\PublicShareController;
 use App\Models\Database;
 use App\Models\Table;
+use App\Support\Access;
 use App\Support\FieldTypes;
 use App\Support\RowQuery;
 use App\Support\SelectColors;
@@ -20,6 +21,7 @@ class TableController extends Controller
     public function store(Request $request, Database $database)
     {
         $this->databaseForUser($database);
+        $this->assertCanBuild($this->workspaceForUser($database->workspace_id));
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
         ]);
@@ -34,6 +36,11 @@ class TableController extends Controller
     public function show(Request $request, Table $table)
     {
         $table = $this->tableForUser($table);
+        $workspace = $this->workspaceOfTable($table);
+        $user = $request->user();
+        $canBuild = Access::canBuild($user, $workspace);
+        $canEdit = Access::canEditData($user, $workspace);
+        $surface = Access::surface($user, $workspace);
         $viewId = $request->integer('view');
         $view = $viewId
             ? $table->views->firstWhere('id', $viewId)
@@ -160,7 +167,10 @@ class TableController extends Controller
                     'type' => $field->type,
                 ])->values(),
             ]),
-            'readOnly' => false,
+            'readOnly' => ! $canEdit,
+            'canBuild' => $canBuild && $surface === 'builder',
+            'role' => Access::role($user, $workspace),
+            'surface' => $surface,
             'routes' => [
                 'field' => url('/fields'),
                 'row' => url('/rows'),
@@ -180,8 +190,14 @@ class TableController extends Controller
             'search' => $search,
             'fieldTypes' => FieldTypes::all(),
             'selectColors' => SelectColors::all(),
-            'user' => auth()->user(),
+            'user' => $user,
             'bootstrap' => $bootstrap,
+            'canBuild' => $canBuild,
+            'showBuilderTools' => $canBuild && $surface === 'builder',
+            'canEdit' => $canEdit,
+            'role' => Access::role($user, $workspace),
+            'plan' => $workspace->resolvedPlan(),
+            'surface' => $surface,
         ]);
     }
 

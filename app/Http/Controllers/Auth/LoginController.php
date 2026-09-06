@@ -29,6 +29,7 @@ class LoginController extends Controller
         }
 
         $request->session()->regenerate();
+        $this->rememberSurface($request->user());
 
         return redirect()->intended(route('dashboard'));
     }
@@ -44,8 +45,17 @@ class LoginController extends Controller
 
         Auth::login($user, true);
         $request->session()->regenerate();
+        $this->rememberSurface($user);
 
         return redirect()->route('dashboard');
+    }
+
+    private function rememberSurface($user): void
+    {
+        $workspace = $user->workspaces()->with('members')->first();
+        if ($workspace && ! \App\Support\Access::canBuild($user, $workspace)) {
+            session(['surface' => 'app']);
+        }
     }
 
     public function destroy(Request $request)

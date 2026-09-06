@@ -29,7 +29,7 @@
                         <div class="entity-card__icon entity-card__icon--workspace">{{ strtoupper(substr($workspace->name, 0, 1)) }}</div>
                         <div class="entity-card__body">
                             <h3>{{ $workspace->name }}</h3>
-                            <p>{{ $workspace->databases->count() }} {{ \Illuminate\Support\Str::plural('database', $workspace->databases->count()) }} · {{ $workspace->members->count() }} {{ \Illuminate\Support\Str::plural('member', $workspace->members->count()) }}</p>
+                            <p>{{ $workspace->plan?->name ?? 'Free' }} · {{ $workspace->databases->count() }} {{ \Illuminate\Support\Str::plural('database', $workspace->databases->count()) }} · {{ $workspace->members->count() }} {{ \Illuminate\Support\Str::plural('member', $workspace->members->count()) }}</p>
                         </div>
                         @include('partials.icon', ['name' => 'chevron-right', 'size' => 16])
                     </a>

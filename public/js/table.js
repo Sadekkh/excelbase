@@ -10,6 +10,7 @@
   let calendarCursor = new Date();
   let active = null;
   const readOnly = !!state.readOnly;
+  const canBuild = !!state.canBuild;
 
   const ICONS = {
     text: "M6 6h12M12 6v13",
@@ -217,7 +218,7 @@
                     </div>
                     <div class="col-resizer" data-resize="${f.id}"></div>
                   </th>`).join("")}
-                <th style="min-width:140px">${readOnly ? "" : `<button class="add-field" data-add-field>${icon("plus")} Add field</button>`}</th>
+                <th style="min-width:140px">${canBuild ? `<button class="add-field" data-add-field>${icon("plus")} Add field</button>` : ""}</th>
               </tr>
             </thead>
             <tbody>
@@ -991,9 +992,9 @@
 
   document.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-add-field]");
-    if (t) { if (!readOnly) fieldModal(); return; }
+    if (t) { if (canBuild) fieldModal(); return; }
     const fh = e.target.closest("[data-field-menu]");
-    if (fh) { fieldModal(fieldById(fh.dataset.fieldMenu)); return; }
+    if (fh) { if (canBuild) fieldModal(fieldById(fh.dataset.fieldMenu)); return; }
     const addRowBtn = e.target.closest("[data-add-row]");
     if (addRowBtn) {
       let preset = {};
@@ -1021,7 +1022,7 @@
       return;
     }
     const createView = e.target.closest("[data-create-view]");
-    if (createView) {
+    if (createView && canBuild) {
       const form = document.createElement("form");
       form.method = "post";
       form.action = state.urls.views;

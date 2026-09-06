@@ -13,7 +13,8 @@ class DatabaseController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
-        $this->workspaceForUser($workspace->id);
+        $workspace = $this->workspaceForUser($workspace->id);
+        $this->assertCanBuild($workspace);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
         ]);
@@ -41,6 +42,7 @@ class DatabaseController extends Controller
     public function update(Request $request, Database $database)
     {
         $this->databaseForUser($database);
+        $this->assertCanBuild($this->workspaceForUser($database->workspace_id));
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
         ]);
@@ -55,6 +57,7 @@ class DatabaseController extends Controller
     {
         $workspaceId = $database->workspace_id;
         $this->databaseForUser($database);
+        $this->assertCanBuild($this->workspaceForUser($database->workspace_id));
         $database->delete();
 
         return $request->expectsJson()

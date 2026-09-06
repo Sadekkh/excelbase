@@ -1,14 +1,15 @@
 @extends('layouts.app')
-@section('title', $workspace->name.' | Baserow')
+@section('title', $workspace->name.' · Builder | Baserow')
 @section('content')
-<div class="home">
-    @include('partials.topbar', ['pageTitle' => $workspace->name])
+<div class="home home--saas">
+    @include('partials.workspace-nav')
     <main class="home__main">
+        @if (session('status'))<p class="banner">{{ session('status') }}</p>@endif
         <header class="home__head">
             <div>
-                <a class="home__crumb" href="{{ route('dashboard') }}">All workspaces</a>
-                <h1>{{ $workspace->name }}</h1>
-                <p>Databases in this workspace. Open one to work with tables and views.</p>
+                <p class="home__crumb">Builder · {{ $plan->name }} plan</p>
+                <h1>Create the structure</h1>
+                <p>Databases, tables, fields, and views live here. Switch to <strong>Open as user</strong> to see the same workspace the way members do.</p>
             </div>
             <div class="home__actions">
                 <button type="button" class="btn btn--ghost" data-open-modal="rename-workspace">Rename</button>

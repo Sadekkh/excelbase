@@ -171,6 +171,45 @@ class BaserowTest extends TestCase
         $this->assertSame('Table', $database->tables()->first()->name);
     }
 
+    public function test_saas_roles_admin_and_automations(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $owner = User::query()->where('email', 'demo@baserow.io')->first();
+        $member = User::query()->where('email', 'maya@baserow.io')->first();
+        $workspace = Workspace::query()->where('name', 'Acme Inc')->first();
+        $table = Table::query()->where('name', 'Deals')->first();
+
+        $this->actingAs($owner)->get(route('admin.index'))->assertOk()->assertSee('Platform');
+        $this->actingAs($member)->get(route('admin.index'))->assertForbidden();
+
+        $this->actingAs($member)->get(route('workspaces.show', $workspace))
+            ->assertRedirect(route('workspaces.app', $workspace));
+        $this->actingAs($member)->get(route('workspaces.app', $workspace))
+            ->assertOk()
+            ->assertSee('CRM overview')
+            ->assertSee('Using Acme Inc');
+
+        $this->actingAs($member)->postJson(route('fields.store', $table), [
+            'name' => 'Secret',
+            'type' => 'text',
+        ])->assertForbidden();
+
+        $this->actingAs($owner)->get(route('automations.index', $workspace))
+            ->assertOk()
+            ->assertSee('Notify builders of new deals');
+
+        $primary = $table->fields()->where('primary', true)->first();
+        $before = \App\Models\Notification::query()->count();
+        $this->actingAs($owner)->postJson(route('rows.store', $table), [
+            'values' => [(string) $primary->id => 'Automation deal'],
+        ])->assertCreated();
+        $this->assertGreaterThan($before, \App\Models\Notification::query()->count());
+
+        $this->actingAs($owner)->get(route('workspaces.billing', $workspace))
+            ->assertOk()
+            ->assertSee('Premium');
+    }
+
     public function test_formula_lookup_count_and_ai_fields(): void
     {
         $this->seed(DemoSeeder::class);

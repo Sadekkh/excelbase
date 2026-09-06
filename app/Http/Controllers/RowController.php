@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\AuthorizesWorkspace;
 use App\Models\Field;
 use App\Models\Row;
 use App\Models\Table;
+use App\Support\AutomationEngine;
 use Illuminate\Http\Request;
 
 class RowController extends Controller
@@ -25,6 +26,7 @@ class RowController extends Controller
     public function store(Request $request, Table $table)
     {
         $this->tableForUser($table);
+        $this->assertCanEdit($this->workspaceOfTable($table));
         $fields = $table->fields;
         $values = $request->input('values', []);
         $after = $request->input('after_id');
@@ -47,6 +49,7 @@ class RowController extends Controller
         $row->save();
         $fresh = $row->fresh();
         $fresh->setRelation('table', $table->loadMissing('fields'));
+        AutomationEngine::dispatch($table, $fresh, 'row_created');
 
         return response()->json($fresh->toApi($fields), 201);
     }
@@ -54,13 +57,16 @@ class RowController extends Controller
     public function update(Request $request, Row $row)
     {
         $this->rowForUser($row);
+        $this->assertCanEdit($this->workspaceOfTable($row->table));
         $fields = $row->table->fields()->get()->keyBy('id');
         $values = $request->input('values', []);
+        $changed = [];
 
         foreach ($values as $fieldId => $value) {
             $field = $fields->get((int) $fieldId);
             if ($field) {
                 $row->setValue($field, $value);
+                $changed[] = (int) $fieldId;
             }
         }
 
@@ -72,6 +78,7 @@ class RowController extends Controller
         $fresh = $row->fresh();
         $table = $row->table->loadMissing('fields');
         $fresh->setRelation('table', $table);
+        AutomationEngine::dispatch($table, $fresh, 'row_updated', $changed);
 
         return response()->json($fresh->toApi($table->fields));
     }

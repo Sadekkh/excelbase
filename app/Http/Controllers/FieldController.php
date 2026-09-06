@@ -16,11 +16,14 @@ class FieldController extends Controller
     public function store(Request $request, Table $table)
     {
         $this->tableForUser($table);
+        $workspace = $this->workspaceOfTable($table);
+        $this->assertCanBuild($workspace);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'type' => ['required', Rule::in(array_keys(FieldTypes::all()))],
             'options' => ['nullable', 'array'],
         ]);
+        abort_unless($workspace->resolvedPlan()->allowsField($data['type']), 422, 'Upgrade your plan to use this field type.');
 
         $field = $table->fields()->create([
             'name' => $data['name'],
@@ -37,6 +40,7 @@ class FieldController extends Controller
     public function update(Request $request, Field $field)
     {
         $this->fieldForUser($field);
+        $this->assertCanBuild($this->workspaceOfTable($field->table));
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
             'type' => ['sometimes', Rule::in(array_keys(FieldTypes::all()))],
@@ -63,6 +67,7 @@ class FieldController extends Controller
     public function destroy(Field $field)
     {
         $this->fieldForUser($field);
+        $this->assertCanBuild($this->workspaceOfTable($field->table));
         if ($field->primary) {
             return response()->json(['message' => 'The primary field cannot be deleted.'], 422);
         }
