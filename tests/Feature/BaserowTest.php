@@ -458,4 +458,29 @@ class BaserowTest extends TestCase
             ->patchJson(route('views.update', $personal), ['name' => 'Hacked'])
             ->assertForbidden();
     }
+
+    public function test_account_menu_and_profile_update(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $user = User::query()->where('email', 'demo@baserow.io')->first();
+
+        $this->actingAs($user)->get('/app')
+            ->assertOk()
+            ->assertSee('data-menu="user-menu"', false)
+            ->assertSee('id="user-menu"', false)
+            ->assertSee('id="menu-root"', false);
+
+        $boot = $this->actingAs($user)->getJson(route('app.boot'))->assertOk();
+        $this->assertNotEmpty($boot->json('memberships'));
+        $this->assertSame('demo@baserow.io', $boot->json('user.email'));
+
+        $this->actingAs($user)->patchJson(route('profile.update'), [
+            'name' => 'Alex Rivera Updated',
+        ])->assertOk()->assertJsonPath('user.name', 'Alex Rivera Updated');
+
+        $this->assertSame('Alex Rivera Updated', $user->fresh()->name);
+
+        $this->actingAs($user)->post('/logout')->assertRedirect('/');
+        $this->get('/app')->assertRedirect('/');
+    }
 }

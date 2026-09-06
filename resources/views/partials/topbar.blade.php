@@ -10,6 +10,7 @@
         @include('partials.icon', ['name' => 'chevron-down', 'size' => 14])
         <div class="menu" id="user-menu" hidden>
             <div class="menu__meta">{{ auth()->user()->email }}</div>
+            <a href="{{ route('app') }}">Profile</a>
             <a href="{{ route('dashboard') }}">Workspaces</a>
             <a href="{{ route('notifications.index') }}">Inbox</a>
             @if (auth()->user()->is_platform_admin)

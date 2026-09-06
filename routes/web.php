@@ -13,6 +13,7 @@ use App\Http\Controllers\FieldController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\PublicShareController;
 use App\Http\Controllers\RowController;
@@ -37,6 +38,7 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/surface', [SurfaceController::class, 'switch'])->name('surface.switch');
     Route::get('/inbox', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/inbox/{notification}', [NotificationController::class, 'read'])->name('notifications.read');

@@ -30,6 +30,7 @@
     lock: "M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10M6 10h12v10H6z",
     inbox: "M5 5h14v10H9l-4 4z",
     logout: "M10 7V5.5A1.5 1.5 0 0 1 11.5 4h7A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 10 18.5V17M4 12h10M7 9l-3 3 3 3",
+    user: "M12 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 19.2c.8-3.2 3.4-5 7-5s6.2 1.8 7 5",
     home: "M4 11 12 4l8 7v9H4z",
     admin: "M12 4.5v1.8M12 17.7V19.5M4.5 12h1.8M17.7 12H19.5M6.4 6.4l1.3 1.3M16.3 16.3l1.3 1.3",
     x: "M6 6l12 12M18 6 6 18",
@@ -78,6 +79,10 @@
     app.dataset.surface = boot.surface;
     const role = document.getElementById("user-role-label");
     if (role) role.textContent = boot.role_label;
+    const nameLabel = document.getElementById("user-name-label");
+    if (nameLabel) nameLabel.textContent = boot.user.name;
+    const avatar = document.getElementById("user-avatar");
+    if (avatar) avatar.textContent = boot.user.initials;
     document.querySelector(".sidebar__workspace-name").textContent = boot.workspace.name;
     applyBrand();
   }
@@ -151,12 +156,14 @@
     const menu = document.getElementById("user-menu");
     if (!menu) return;
     menu.innerHTML = `
-      <button type="button" data-go="${boot.urls.inbox}">Inbox${boot.unread ? ` (${boot.unread})` : ""}</button>
-      ${boot.user.is_platform_admin ? `<button type="button" data-go="${boot.urls.admin}">Platform admin</button>` : ""}
+      <div class="menu__meta">${esc(boot.user.email)}</div>
+      <button type="button" data-nav="profile">${icon("user")} Profile</button>
+      <button type="button" data-go="${boot.urls.inbox}">${icon("inbox")} Inbox${boot.unread ? ` (${boot.unread})` : ""}</button>
+      ${boot.user.is_platform_admin ? `<button type="button" data-go="${boot.urls.admin}">${icon("admin")} Platform admin</button>` : ""}
       <div class="menu__sep"></div>
       <form method="post" action="${boot.urls.logout}">
         <input type="hidden" name="_token" value="${boot.urls.csrf}">
-        <button type="submit">Sign out</button>
+        <button type="submit" class="is-danger">${icon("logout")} Log out</button>
       </form>
     `;
   }
@@ -428,6 +435,37 @@
     </div></div>`;
   }
 
+  function renderProfile() {
+    const u = boot.user;
+    renderPageChrome("Profile", u.email);
+    const seats = (boot.memberships || []).map((item) => `
+      <tr>
+        <td><button type="button" class="linkish" data-nav="workspace" data-id="${item.id}">${esc(item.name)}</button></td>
+        <td>${esc(item.role_label)}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="2" class="hint">You do not belong to a workspace yet.</td></tr>`;
+    stage.innerHTML = `<div class="page-body"><div class="split">
+      <form class="side-card" id="profile-form">
+        <h2>Your account</h2>
+        <label class="field"><span>Name</span><input name="name" required maxlength="120" value="${esc(u.name)}"></label>
+        <label class="field"><span>Email</span><input value="${esc(u.email)}" disabled></label>
+        <label class="field"><span>New password</span><input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Leave blank to keep the current password"></label>
+        <label class="field"><span>Confirm password</span><input type="password" name="password_confirmation" minlength="8" autocomplete="new-password"></label>
+        <button class="btn btn--primary" type="submit">Save profile</button>
+      </form>
+      <div>
+        <article class="side-card">
+          <h2>Workspaces you belong to</h2>
+          <p class="hint">Access is per workspace. A parent does not grant a child automatically.</p>
+          <table class="data-table">
+            <thead><tr><th>Workspace</th><th>Role</th></tr></thead>
+            <tbody>${seats}</tbody>
+          </table>
+        </article>
+      </div>
+    </div></div>`;
+  }
+
   function renderLook() {
     const w = boot.workspace;
     renderPageChrome("Look", "Accent, sidebar, and logo belong to this workspace. Switching workspaces restores that workspace’s look and its own Build mode.");
@@ -601,6 +639,8 @@
         renderStructure(await api(boot.urls.structure));
       } else if (kind === "look") {
         renderLook();
+      } else if (kind === "profile") {
+        renderProfile();
       }
     } catch (err) {
       toast(err.message || "Could not open this panel");
@@ -710,6 +750,7 @@
     }
     const go = e.target.closest("[data-go]");
     if (go) {
+      window.Baserow.closeMenus();
       window.location.assign(go.dataset.go);
       return;
     }
@@ -720,6 +761,7 @@
     }
     const navBtn = e.target.closest("[data-nav]");
     if (navBtn) {
+      window.Baserow.closeMenus();
       const kind = navBtn.dataset.nav;
       if (kind === "sheet") await openSheet(navBtn.dataset.id);
       else if (kind === "board") await openPanel("board", Number(navBtn.dataset.id));
@@ -835,6 +877,24 @@
   });
 
   document.addEventListener("submit", async (e) => {
+    const profile = e.target.closest("#profile-form");
+    if (profile) {
+      e.preventDefault();
+      const fd = new FormData(profile);
+      const body = {};
+      fd.forEach((value, key) => { body[key] = value; });
+      try {
+        const res = await api(boot.urls.profile, { method: "PATCH", body: JSON.stringify(body) });
+        boot.user = { ...boot.user, ...res.user };
+        toast(res.status || "Profile saved");
+        renderMode();
+        renderUserMenu();
+        renderProfile();
+      } catch (err) {
+        toast(err.message || "Could not save profile");
+      }
+      return;
+    }
     const form = e.target.closest("#look-form");
     if (!form) return;
     e.preventDefault();

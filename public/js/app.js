@@ -38,15 +38,30 @@
   };
 
   function placeMenu(menu, anchor) {
+    const root = document.getElementById("menu-root") || document.body;
+    if (menu.parentElement !== root) {
+      root.appendChild(menu);
+    }
     const rect = anchor.getBoundingClientRect();
     menu.hidden = false;
     menu.style.position = "fixed";
-    const top = rect.bottom + 4;
+    menu.style.zIndex = "60";
+    const mw = Math.max(menu.offsetWidth, 200);
+    const mh = menu.offsetHeight || 8;
     let left = rect.left;
-    const mw = menu.offsetWidth;
-    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
-    menu.style.top = `${top}px`;
-    menu.style.left = `${Math.max(8, left)}px`;
+    if (left + mw > window.innerWidth - 8) left = rect.right - mw;
+    left = Math.min(Math.max(8, left), window.innerWidth - mw - 8);
+    const spaceBelow = window.innerHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    let top = rect.bottom + 4;
+    if (spaceBelow < mh && spaceAbove > spaceBelow) {
+      top = Math.max(8, rect.top - mh - 4);
+    } else if (top + mh > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - mh - 8);
+    }
+    menu.style.top = `${Math.round(top)}px`;
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.minWidth = `${Math.max(mw, rect.width)}px`;
   }
 
   document.addEventListener("click", (e) => {
@@ -64,6 +79,8 @@
     }
     if (!e.target.closest(".menu")) window.Baserow.closeMenus();
   });
+
+  window.addEventListener("resize", () => window.Baserow.closeMenus());
 
   document.addEventListener("click", (e) => {
     const open = e.target.closest("[data-open-modal]");

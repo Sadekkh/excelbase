@@ -254,11 +254,19 @@ img { max-width: 100%; }
 .tree-table.is-active { background: color-mix(in srgb, var(--brand, var(--blue-500)) 14%, #fff); color: var(--brand, var(--blue-800)); font-weight: 500; }
 .sidebar__user {
   border-top: 1px solid var(--neutral-200); padding: 8px;
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
+.sidebar__user-btn {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 8px; border-radius: var(--radius-lg);
+  color: inherit; text-align: left;
+}
+.sidebar__user-btn:hover { background: rgba(7, 8, 16, 0.04); }
 .sidebar__user-info { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .sidebar__user-info strong { display: block; font-size: 12px; }
 .sidebar__user-info small { display: block; color: var(--neutral-900); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+#menu-root { position: relative; z-index: 60; }
+#menu-root .menu { max-height: min(70vh, 420px); overflow: auto; }
 
 .workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fff; }
 .views-bar {
@@ -711,8 +719,10 @@ img { max-width: 100%; }
 .app.is-dark-sidebar .nav-item,
 .app.is-dark-sidebar .tree-table,
 .app.is-dark-sidebar .tree-db summary,
-.app.is-dark-sidebar .sidebar__user-info strong { color: #f4f4f5; }
+.app.is-dark-sidebar .sidebar__user-info strong,
+.app.is-dark-sidebar .sidebar__user-btn { color: #f4f4f5; }
 .app.is-dark-sidebar .sidebar__user-info small { color: rgba(255,255,255,0.7); }
+.app.is-dark-sidebar .sidebar__user-btn:hover { background: rgba(255,255,255,0.06); }
 .app.is-dark-sidebar .nav-item:hover,
 .app.is-dark-sidebar .tree-table:hover,
 .app.is-dark-sidebar .tree-db summary:hover,

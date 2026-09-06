@@ -36,6 +36,12 @@ class WorkspaceShell
                 'initials' => strtoupper(substr($user->name, 0, 1)),
                 'is_platform_admin' => (bool) $user->is_platform_admin,
             ],
+            'memberships' => $user->workspaces()->get()->map(fn ($ws) => [
+                'id' => $ws->id,
+                'name' => $ws->name,
+                'role' => $ws->pivot->role,
+                'role_label' => Access::label($ws->pivot->role),
+            ])->values(),
             'role' => Access::role($user, $workspace),
             'role_label' => Access::label(Access::role($user, $workspace)),
             'plan' => [
@@ -84,6 +90,7 @@ class WorkspaceShell
                 'look' => route('workspaces.look', $workspace),
                 'memberChild' => route('members.child', $workspace),
                 'logout' => route('logout'),
+                'profile' => route('profile.update'),
                 'inbox' => route('notifications.index'),
                 'admin' => route('admin.index'),
                 'csrf' => csrf_token(),

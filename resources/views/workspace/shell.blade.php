@@ -43,17 +43,17 @@
         </div>
 
         <div class="sidebar__user">
-            <div class="sidebar__user-info">
-                <span class="avatar avatar--sm">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
-                <div>
-                    <strong>{{ $user->name }}</strong>
-                    <small id="user-role-label">{{ \App\Support\Access::label($role) }}</small>
-                </div>
-            </div>
-            <button type="button" class="icon-btn" data-menu="user-menu" title="Account">
-                @include('partials.icon', ['name' => 'more-v', 'size' => 16])
+            <button type="button" class="sidebar__user-btn" id="user-menu-btn" data-menu="user-menu" aria-haspopup="menu" aria-expanded="false" title="Account">
+                <span class="sidebar__user-info">
+                    <span class="avatar avatar--sm" id="user-avatar">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
+                    <span>
+                        <strong id="user-name-label">{{ $user->name }}</strong>
+                        <small id="user-role-label">{{ \App\Support\Access::label($role) }}</small>
+                    </span>
+                </span>
+                @include('partials.icon', ['name' => 'chevron-down', 'size' => 14])
             </button>
-            <div class="menu" id="user-menu" hidden></div>
+            <div class="menu" id="user-menu" hidden role="menu"></div>
         </div>
     </aside>
 
