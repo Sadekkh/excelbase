@@ -470,21 +470,30 @@
   }
 
   async function setSurface(surface) {
-    if (!boot.can_build || surface === boot.surface) return;
-    boot = await api(`/workspace/${boot.workspace.id}/surface`, {
-      method: "POST",
-      body: JSON.stringify({ surface }),
-    });
-    renderMode();
-    renderNav();
-    if (surface === "builder") {
-      await openPanel("structure");
-    } else if (current.tableId) {
-      await openSheet(current.tableId);
-    } else if (boot.start.table_id) {
-      await openSheet(boot.start.table_id);
-    } else if (boot.start.dashboard_id) {
-      await openPanel("board", boot.start.dashboard_id);
+    if (!boot.can_build) {
+      toast("Build is for owners, admins, and builders.");
+      return;
+    }
+    try {
+      if (surface !== boot.surface) {
+        boot = await api(`/workspace/${boot.workspace.id}/surface`, {
+          method: "POST",
+          body: JSON.stringify({ surface }),
+        });
+      }
+      renderMode();
+      renderNav();
+      if (surface === "builder") {
+        await openPanel("structure");
+      } else if (current.tableId) {
+        await openSheet(current.tableId);
+      } else if (boot.start.table_id) {
+        await openSheet(boot.start.table_id);
+      } else if (boot.start.dashboard_id) {
+        await openPanel("board", boot.start.dashboard_id);
+      }
+    } catch (err) {
+      toast(err.message || "Could not switch mode");
     }
   }
 

@@ -17,15 +17,8 @@ class MemberController extends Controller
     {
         $workspace = $this->workspaceForUser($workspace->id);
         $this->assertCanManage($workspace);
-        $workspace->load(['members', 'plan']);
 
-        return view('workspace.members', [
-            'workspace' => $workspace,
-            'workspaces' => auth()->user()->workspaces,
-            'user' => auth()->user(),
-            'role' => Access::role(auth()->user(), $workspace),
-            'plan' => $workspace->resolvedPlan(),
-        ]);
+        return redirect()->route('workspaces.show', $workspace);
     }
 
     public function store(Request $request, Workspace $workspace)

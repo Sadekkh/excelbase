@@ -963,6 +963,9 @@ window.BaserowTable = (() => {
     box.hidden = !box.hidden;
     if (box.hidden) return;
     if (name === "filters") {
+      if (!(state.view.filters || []).length) {
+        state.view.filters = [{ field_id: state.fields[0].id, operator: "contains", value: "" }];
+      }
       const items = state.view.filters || [];
       box.innerHTML = items.map((f, i) => {
         const field = fieldById(f.field_id) || state.fields[0];

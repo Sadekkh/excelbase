@@ -24,7 +24,7 @@ class DatabaseController extends Controller
 
         return $request->expectsJson()
             ? response()->json(['database' => $database, 'table_id' => $table?->id])
-            : redirect()->route('tables.show', $table);
+            : redirect()->route('workspaces.show', $workspace);
     }
 
     public function show(Database $database)
@@ -36,7 +36,7 @@ class DatabaseController extends Controller
             return redirect()->route('workspaces.show', $database->workspace_id);
         }
 
-        return redirect()->route('tables.show', $table);
+        return redirect()->route('workspaces.show', $database->workspace_id);
     }
 
     public function update(Request $request, Database $database)

@@ -18,43 +18,16 @@ class BoardController extends Controller
     public function index(Workspace $workspace)
     {
         $workspace = $this->workspaceForUser($workspace->id);
-        $workspace->load(['dashboards.widgets', 'databases.tables.fields', 'plan', 'members']);
 
-        return view('dashboard.boards', [
-            'workspace' => $workspace,
-            'workspaces' => auth()->user()->workspaces,
-            'user' => auth()->user(),
-            'role' => Access::role(auth()->user(), $workspace),
-            'plan' => $workspace->resolvedPlan(),
-            'canBuild' => Access::canBuild(auth()->user(), $workspace),
-            'surface' => Access::surface(auth()->user(), $workspace),
-        ]);
+        return redirect()->route('workspaces.show', $workspace);
     }
 
     public function show(Workspace $workspace, Dashboard $dashboard)
     {
         $workspace = $this->workspaceForUser($workspace->id);
         abort_unless($dashboard->workspace_id === $workspace->id, 404);
-        $dashboard->load('widgets');
-        $workspace->load(['databases.tables.fields', 'plan', 'members']);
-        $widgets = $dashboard->widgets->map(function (DashboardWidget $widget) {
-            return [
-                'model' => $widget,
-                'data' => DashboardData::resolve($widget),
-            ];
-        });
 
-        return view('dashboard.board', [
-            'workspace' => $workspace,
-            'workspaces' => auth()->user()->workspaces,
-            'user' => auth()->user(),
-            'role' => Access::role(auth()->user(), $workspace),
-            'plan' => $workspace->resolvedPlan(),
-            'canBuild' => Access::canBuild(auth()->user(), $workspace),
-            'surface' => Access::surface(auth()->user(), $workspace),
-            'dashboard' => $dashboard,
-            'widgets' => $widgets,
-        ]);
+        return redirect()->route('workspaces.show', $workspace);
     }
 
     public function store(Request $request, Workspace $workspace)

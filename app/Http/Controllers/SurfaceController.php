@@ -3,10 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesWorkspace;
-use App\Models\Dashboard;
 use App\Models\Workspace;
 use App\Support\Access;
-use App\Support\DashboardData;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -40,26 +38,8 @@ class SurfaceController extends Controller
     public function app(Workspace $workspace)
     {
         $workspace = $this->workspaceForUser($workspace->id);
-        $workspace->load(['dashboards.widgets', 'databases.tables', 'plan', 'members']);
-        $board = $workspace->dashboards->firstWhere('is_default') ?? $workspace->dashboards->first();
-        $widgets = collect();
-        if ($board) {
-            $widgets = $board->widgets->map(fn ($widget) => [
-                'model' => $widget,
-                'data' => DashboardData::resolve($widget),
-            ]);
-        }
 
-        return view('workspace.app', [
-            'workspace' => $workspace,
-            'workspaces' => auth()->user()->workspaces,
-            'user' => auth()->user(),
-            'role' => Access::role(auth()->user(), $workspace),
-            'plan' => $workspace->resolvedPlan(),
-            'dashboard' => $board,
-            'widgets' => $widgets,
-            'surface' => 'app',
-        ]);
+        return redirect()->route('workspaces.show', $workspace);
     }
 
     public function billing(Workspace $workspace)
@@ -67,14 +47,7 @@ class SurfaceController extends Controller
         $workspace = $this->workspaceForUser($workspace->id);
         $this->assertCanManage($workspace);
 
-        return view('workspace.billing', [
-            'workspace' => $workspace->load(['plan', 'members']),
-            'workspaces' => auth()->user()->workspaces,
-            'user' => auth()->user(),
-            'role' => Access::role(auth()->user(), $workspace),
-            'plan' => $workspace->resolvedPlan(),
-            'plans' => \App\Models\Plan::ensureDefaults(),
-        ]);
+        return redirect()->route('workspaces.show', $workspace);
     }
 
     public function choosePlan(Request $request, Workspace $workspace)

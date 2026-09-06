@@ -54,7 +54,7 @@ class ViewController extends Controller
 
         return $request->expectsJson()
             ? response()->json($view)
-            : redirect()->route('tables.show', ['table' => $table, 'view' => $view->id]);
+            : redirect()->route('workspaces.show', $workspace);
     }
 
     public function update(Request $request, View $view)

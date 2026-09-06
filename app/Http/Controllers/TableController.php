@@ -53,6 +53,10 @@ class TableController extends Controller
         $rows = $payload['rows'];
         $bootstrap = $payload['bootstrap'];
 
+        if (! $request->expectsJson()) {
+            return redirect()->route('workspaces.show', $workspace);
+        }
+
         $table->database->workspace->load(['databases.tables']);
         $workspaces = auth()->user()->workspaces()->with('databases.tables')->get();
 

@@ -6,7 +6,7 @@
 @endphp
 <nav class="saas-nav">
     <div class="saas-nav__brand">
-        <a href="{{ $surface === 'app' ? route('workspaces.app', $workspace) : route('workspaces.show', $workspace) }}">
+        <a href="{{ route('workspaces.show', $workspace) }}">
             <span class="avatar avatar--sm">{{ strtoupper(substr($workspace->name, 0, 1)) }}</span>
             <strong>{{ $workspace->name }}</strong>
         </a>
@@ -15,21 +15,9 @@
     </div>
     <div class="saas-nav__links">
         @if ($surface === 'app')
-            <a href="{{ route('workspaces.app', $workspace) }}" class="{{ request()->routeIs('workspaces.app') ? 'is-on' : '' }}">Home</a>
-            <a href="{{ route('dashboards.index', $workspace) }}" class="{{ request()->routeIs('dashboards.*') ? 'is-on' : '' }}">Dashboards</a>
-            @foreach ($workspace->databases as $db)
-                @foreach ($db->tables as $tbl)
-                    <a href="{{ route('tables.show', $tbl) }}" class="{{ isset($table) && $table->id === $tbl->id ? 'is-on' : '' }}">{{ $tbl->name }}</a>
-                @endforeach
-            @endforeach
+            <a href="{{ route('workspaces.show', $workspace) }}" class="{{ request()->routeIs('workspaces.show') ? 'is-on' : '' }}">Home</a>
         @else
-            <a href="{{ route('workspaces.show', $workspace) }}" class="{{ request()->routeIs('workspaces.show') ? 'is-on' : '' }}">Structure</a>
-            <a href="{{ route('dashboards.index', $workspace) }}" class="{{ request()->routeIs('dashboards.*') ? 'is-on' : '' }}">Dashboards</a>
-            <a href="{{ route('automations.index', $workspace) }}" class="{{ request()->routeIs('automations.*') ? 'is-on' : '' }}">Automations</a>
-            @if (\App\Support\Access::canManage(auth()->user(), $workspace))
-                <a href="{{ route('members.index', $workspace) }}" class="{{ request()->routeIs('members.*') ? 'is-on' : '' }}">People</a>
-                <a href="{{ route('workspaces.billing', $workspace) }}" class="{{ request()->routeIs('workspaces.billing') ? 'is-on' : '' }}">Plan</a>
-            @endif
+            <a href="{{ route('workspaces.show', $workspace) }}" class="{{ request()->routeIs('workspaces.show') ? 'is-on' : '' }}">Workspace</a>
         @endif
     </div>
     <div class="saas-nav__tools">

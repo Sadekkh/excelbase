@@ -23,7 +23,7 @@
                                 </select>
                             </form>
                         </td>
-                        <td><a class="btn btn--ghost" href="{{ route('workspaces.app', $ws) }}">Open as user</a></td>
+                        <td><a class="btn btn--ghost" href="{{ route('workspaces.show', $ws) }}">Open workspace</a></td>
                     </tr>
                 @endforeach
             </tbody>

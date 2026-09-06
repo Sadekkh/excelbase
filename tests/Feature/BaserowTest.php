@@ -60,12 +60,19 @@ class BaserowTest extends TestCase
         $user = User::query()->where('email', 'demo@baserow.io')->first();
         $table = Table::query()->where('name', 'Clients')->first();
 
+        $workspace = $table->database->workspace;
         $this->actingAs($user)
             ->get(route('tables.show', $table))
+            ->assertRedirect(route('workspaces.show', $workspace));
+        $this->actingAs($user)
+            ->getJson(route('workspaces.panel.sheet', [$workspace, $table]))
             ->assertOk()
-            ->assertSee('Clients')
-            ->assertSee('Northwind Labs')
-            ->assertSee('Pipeline');
+            ->assertJsonPath('bootstrap.table.name', 'Clients')
+            ->assertJsonPath('bootstrap.view.name', 'Grid');
+        $this->assertTrue(
+            collect($this->actingAs($user)->getJson(route('workspaces.panel.sheet', [$workspace, $table]))->json('bootstrap.rows'))
+                ->contains(fn ($row) => collect($row['values'])->contains('Northwind Labs'))
+        );
 
         $field = $table->fields()->where('primary', true)->first();
         $create = $this->actingAs($user)->postJson(route('rows.store', $table), [
@@ -198,6 +205,12 @@ class BaserowTest extends TestCase
             ->assertJsonPath('surface', 'builder')
             ->assertJsonPath('can_build', true);
 
+        $this->actingAs($member)->getJson(route('workspaces.panel.boot', $workspace))
+            ->assertOk()
+            ->assertJsonPath('can_build', false)
+            ->assertJsonPath('surface', 'app');
+        $this->actingAs($member)->postJson(route('workspaces.surface', $workspace), ['surface' => 'builder'])
+            ->assertForbidden();
         $this->actingAs($member)->getJson(route('workspaces.panel.automations', $workspace))
             ->assertForbidden();
 
@@ -207,8 +220,10 @@ class BaserowTest extends TestCase
         ])->assertForbidden();
 
         $this->actingAs($owner)->get(route('automations.index', $workspace))
+            ->assertRedirect(route('workspaces.show', $workspace));
+        $this->actingAs($owner)->getJson(route('workspaces.panel.automations', $workspace))
             ->assertOk()
-            ->assertSee('Notify builders of new deals');
+            ->assertJsonFragment(['name' => 'Notify builders of new deals']);
 
         $primary = $table->fields()->where('primary', true)->first();
         $before = \App\Models\Notification::query()->count();
@@ -218,8 +233,10 @@ class BaserowTest extends TestCase
         $this->assertGreaterThan($before, \App\Models\Notification::query()->count());
 
         $this->actingAs($owner)->get(route('workspaces.billing', $workspace))
+            ->assertRedirect(route('workspaces.show', $workspace));
+        $this->actingAs($owner)->getJson(route('workspaces.panel.plan', $workspace))
             ->assertOk()
-            ->assertSee('Premium');
+            ->assertJsonPath('kind', 'plan');
     }
 
     public function test_formula_lookup_count_and_ai_fields(): void
@@ -288,10 +305,15 @@ class BaserowTest extends TestCase
             ->assertSee('survey-next')
             ->assertDontSee('public-form__brand', false);
 
+        $workspace = $table->database->workspace;
+        $timeline = $table->views()->where('type', 'timeline')->value('id');
         $this->actingAs($user)
-            ->get(route('tables.show', ['table' => $table, 'view' => $table->views()->where('type', 'timeline')->value('id')]))
+            ->get(route('tables.show', ['table' => $table, 'view' => $timeline]))
+            ->assertRedirect(route('workspaces.show', $workspace));
+        $this->actingAs($user)
+            ->getJson(route('workspaces.panel.sheet', [$workspace, $table]).'?view='.$timeline)
             ->assertOk()
-            ->assertSee('Timeline');
+            ->assertJsonPath('bootstrap.view.type', 'timeline');
 
         $this->actingAs($user)->post(route('views.store', $table), [
             'type' => 'graph',
@@ -312,14 +334,14 @@ class BaserowTest extends TestCase
         $this->assertNotNull($personal);
 
         $this->actingAs($owner)
-            ->get(route('tables.show', ['table' => $table, 'view' => $personal->id]))
+            ->getJson(route('workspaces.panel.sheet', [$workspace, $table]).'?view='.$personal->id)
             ->assertOk()
-            ->assertSee('My leads');
+            ->assertJsonPath('bootstrap.view.name', 'My leads');
 
         $this->actingAs($teammate)
-            ->get(route('tables.show', ['table' => $table, 'view' => $personal->id]))
+            ->getJson(route('workspaces.panel.sheet', [$workspace, $table]).'?view='.$personal->id)
             ->assertOk()
-            ->assertDontSee('My leads');
+            ->assertJsonMissing(['name' => 'My leads']);
 
         $this->actingAs($teammate)
             ->patchJson(route('views.update', $personal), ['name' => 'Hacked'])
