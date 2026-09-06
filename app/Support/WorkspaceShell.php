@@ -22,11 +22,7 @@ class WorkspaceShell
         $board = $workspace->dashboards->firstWhere('is_default') ?? $workspace->dashboards->first();
 
         return [
-            'workspace' => [
-                'id' => $workspace->id,
-                'name' => $workspace->name,
-                'parent_id' => $workspace->parent_id,
-            ],
+            'workspace' => $workspace->brandPayload(),
             'tree' => Workspace::treeFor($user),
             'workspaces' => $user->workspaces()->orderBy('name')->get()->map(fn ($ws) => [
                 'id' => $ws->id,
@@ -85,6 +81,8 @@ class WorkspaceShell
                 'memberStore' => route('members.store', $workspace),
                 'automationStore' => route('automations.store', $workspace),
                 'planChoose' => route('workspaces.plan', $workspace),
+                'look' => route('workspaces.look', $workspace),
+                'memberChild' => route('members.child', $workspace),
                 'logout' => route('logout'),
                 'inbox' => route('notifications.index'),
                 'admin' => route('admin.index'),
@@ -128,27 +126,46 @@ class WorkspaceShell
      */
     public static function people(Workspace $workspace): array
     {
-        $workspace->loadMissing(['members', 'plan']);
+        $workspace->loadMissing(['members', 'plan', 'children.members']);
         $plan = $workspace->resolvedPlan();
         $roles = $plan->feature('roles') ? Access::ROLES : ['owner', 'member'];
+        $inviteRoles = collect($roles)->filter(fn ($role) => $role !== 'owner')->values();
+        $memberPayload = fn ($member) => [
+            'id' => $member->id,
+            'name' => $member->name,
+            'email' => $member->email,
+            'role' => $member->pivot->role,
+            'role_label' => Access::label($member->pivot->role),
+        ];
 
         return [
             'kind' => 'people',
-            'members' => $workspace->members->map(fn ($member) => [
-                'id' => $member->id,
-                'name' => $member->name,
-                'email' => $member->email,
-                'role' => $member->pivot->role,
-                'role_label' => Access::label($member->pivot->role),
-            ])->values(),
+            'members' => $workspace->members->map($memberPayload)->values(),
             'roles' => collect($roles)->map(fn ($role) => [
                 'id' => $role,
                 'label' => Access::label($role),
             ])->values(),
-            'invite_roles' => collect($roles)->filter(fn ($role) => $role !== 'owner')->values(),
+            'invite_roles' => $inviteRoles,
             'seats' => $workspace->members->count(),
             'seat_limit' => $plan->feature('members'),
             'plan_name' => $plan->name,
+            'children' => $workspace->children->map(function ($child) use ($workspace, $memberPayload, $inviteRoles) {
+                $onChild = $child->members->pluck('id');
+
+                return [
+                    'id' => $child->id,
+                    'name' => $child->name,
+                    'members' => $child->members->map($memberPayload)->values(),
+                    'candidates' => $workspace->members
+                        ->reject(fn ($member) => $onChild->contains($member->id))
+                        ->map(fn ($member) => [
+                            'id' => $member->id,
+                            'name' => $member->name,
+                            'email' => $member->email,
+                        ])->values(),
+                    'invite_roles' => $inviteRoles,
+                ];
+            })->values(),
         ];
     }
 

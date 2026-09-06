@@ -40,6 +40,11 @@ class DemoSeeder extends Seeder
         }
 
         $workspace = Workspace::createForUser($user, 'Acme Inc', $premium);
+        $workspace->update([
+            'tagline' => 'CRM and operations for the parent company',
+            'brand_color' => '#275d9f',
+            'sidebar_color' => '#f4f7fb',
+        ]);
         $crm = Database::create([
             'workspace_id' => $workspace->id,
             'name' => 'CRM',
@@ -71,7 +76,15 @@ class DemoSeeder extends Seeder
 
         $this->seedWorkspaceExperience($workspace, $clients, $deals, $tasks);
 
-        $sales = Workspace::createForUser($user, 'Sales', $premium, $workspace->fresh('members'));
+        $sales = Workspace::createForUser($user, 'Sales', $premium, $workspace);
+        $sales->update([
+            'tagline' => 'A child of Acme with its own roster, tables, and look',
+            'brand_color' => '#0eaa42',
+            'sidebar_color' => '#f3faf5',
+        ]);
+        $sales->members()->syncWithoutDetaching([
+            $sam->id => ['role' => 'builder'],
+        ]);
         Database::createWithTable($sales, 'Pipeline', 'Opportunities');
 
         $personal = Workspace::createForUser($user, 'Personal');

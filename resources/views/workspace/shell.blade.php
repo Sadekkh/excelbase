@@ -4,18 +4,22 @@
 @endphp
 @section('title', 'Baserow')
 @section('content')
-<div class="app shell" id="app" data-surface="{{ $surface }}">
+<div class="app shell" id="app" data-surface="{{ $surface }}" style="--brand: {{ $workspace->brandColor() }}; --sidebar-bg: {{ $workspace->sidebarColor() }};">
     <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
     <aside class="sidebar" id="sidebar">
         <div class="sidebar__head">
             <span class="sidebar__logo">
-                @include('partials.logo', ['size' => 18])
-                <span>Baserow</span>
+                <img class="sidebar__brand-logo" id="brand-logo" alt="" @if($workspace->logoUrl()) src="{{ $workspace->logoUrl() }}" @else hidden @endif>
+                <span id="brand-mark" @if($workspace->logoUrl()) hidden @endif>@include('partials.logo', ['size' => 18])</span>
+                <span id="brand-wordmark">Baserow</span>
             </span>
         </div>
 
         <button type="button" class="sidebar__workspace" data-menu="workspace-menu">
-            <span class="avatar avatar--sm">{{ strtoupper(substr($workspace->name, 0, 1)) }}</span>
+            <span class="avatar avatar--sm" id="workspace-avatar">
+                <img id="workspace-avatar-img" alt="" @if($workspace->logoUrl()) src="{{ $workspace->logoUrl() }}" @else hidden @endif>
+                <span id="workspace-avatar-letter" @if($workspace->logoUrl()) hidden @endif>{{ strtoupper(substr($workspace->name, 0, 1)) }}</span>
+            </span>
             <span class="sidebar__workspace-name">{{ $workspace->name }}</span>
             @include('partials.icon', ['name' => 'chevron-down', 'size' => 14])
         </button>

@@ -20,6 +20,7 @@
     users: "M9 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 18c.6-3 2.8-4.5 5.5-4.5S14 15 14.6 18M16.5 9.2a2.3 2.3 0 1 0 0-4.6 2.3 2.3 0 0 0 0 4.6z",
     bolt: "M13 2 4 14h7l-1 8 9-12h-7z",
     plan: "M12 3.8 14.4 9l5.6.8-4 4 1 5.6L12 16.8 6.9 19.4l1-5.6-4-4L9.6 9 12 3.8z",
+    look: "M12 4.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15zM12 8v4l2.5 1.5",
     plus: "M12 6v12M6 12h12",
     search: "M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM16 16.5 20 20.5",
     filter: "M4 6h16l-6 7.2V18l-4 2v-6.8L4 6z",
@@ -68,16 +69,63 @@
         btn.classList.toggle("is-on", btn.dataset.surface === boot.surface);
       });
       caption.textContent = isBuild()
-        ? "Build structure, automations, and access"
-        : "Work in sheets like a spreadsheet";
+        ? "Build this workspace — look, structure, and access"
+        : "Work in this workspace’s sheets";
     } else {
       box.hidden = true;
-      caption.textContent = "Your workspace sheets";
+      caption.textContent = "Sheets you belong to in this workspace";
     }
     app.dataset.surface = boot.surface;
     const role = document.getElementById("user-role-label");
     if (role) role.textContent = boot.role_label;
     document.querySelector(".sidebar__workspace-name").textContent = boot.workspace.name;
+    applyBrand();
+  }
+
+  function hexLuma(hex) {
+    const n = String(hex || "").replace("#", "");
+    if (n.length !== 6) return 1;
+    const r = parseInt(n.slice(0, 2), 16);
+    const g = parseInt(n.slice(2, 4), 16);
+    const b = parseInt(n.slice(4, 6), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  }
+
+  function applyBrand() {
+    const w = boot.workspace || {};
+    const brand = w.brand_color || "#5190ef";
+    const sidebar = w.sidebar_color || "#fafafa";
+    const dark = hexLuma(sidebar) < 0.55;
+    app.style.setProperty("--brand", brand);
+    app.style.setProperty("--sidebar-bg", sidebar);
+    app.classList.toggle("is-dark-sidebar", dark);
+    const logo = document.getElementById("brand-logo");
+    const mark = document.getElementById("brand-mark");
+    const avatarImg = document.getElementById("workspace-avatar-img");
+    const letter = document.getElementById("workspace-avatar-letter");
+    if (logo) {
+      if (w.logo_url) {
+        logo.src = w.logo_url;
+        logo.hidden = false;
+      } else {
+        logo.removeAttribute("src");
+        logo.hidden = true;
+      }
+    }
+    if (mark) mark.hidden = !!w.logo_url;
+    if (avatarImg) {
+      if (w.logo_url) {
+        avatarImg.src = w.logo_url;
+        avatarImg.hidden = false;
+      } else {
+        avatarImg.removeAttribute("src");
+        avatarImg.hidden = true;
+      }
+    }
+    if (letter) {
+      letter.hidden = !!w.logo_url;
+      letter.textContent = String(w.name || "?").slice(0, 1).toUpperCase();
+    }
   }
 
   function flattenTree(nodes, depth = 0) {
@@ -127,6 +175,7 @@
 
     if (isBuild()) {
       html += `<p class="nav-label">Build</p>`;
+      html += navButton({ nav: "look", icon: "look", label: "Look", active: current.kind === "look" });
       html += navButton({ nav: "structure", icon: "database", label: "Structure", active: current.kind === "structure" });
       html += navButton({ nav: "automations", icon: "bolt", label: "Automations", active: current.kind === "automations" });
       if (boot.can_manage) {
@@ -325,34 +374,98 @@
   }
 
   function renderPeople(data) {
-    renderPageChrome("People", "Owners and admins manage access. Members use sheets. Viewers only read.");
+    renderPageChrome("People", "This workspace has its own roster. A parent can add people from here onto a child — they still need a seat on that child.");
+    const children = (data.children || []).map((child) => `
+      <article class="child-roster">
+        <header>
+          <h3>${esc(child.name)}</h3>
+          <p>${child.members.length} ${child.members.length === 1 ? "person" : "people"} on this child</p>
+        </header>
+        <ul class="plain-list">${child.members.map((m) => `<li>${esc(m.name)} · ${esc(m.role_label)}</li>`).join("") || "<li class='hint'>Empty until someone is added.</li>"}</ul>
+        ${child.candidates.length ? `
+          <form class="child-roster__form" data-ajax="${boot.urls.memberChild}">
+            <input type="hidden" name="child_id" value="${child.id}">
+            <label class="field"><span>From this workspace</span>
+              <select name="user_id">${child.candidates.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select>
+            </label>
+            <label class="field"><span>Role on ${esc(child.name)}</span>
+              <select name="role">${(child.invite_roles || data.invite_roles).map((r) => `<option value="${r}">${esc(r)}</option>`).join("")}</select>
+            </label>
+            <button class="btn btn--primary" type="submit">Add to ${esc(child.name)}</button>
+          </form>
+        ` : `<p class="hint">Everyone here already belongs to ${esc(child.name)}.</p>`}
+      </article>
+    `).join("");
     stage.innerHTML = `<div class="page-body"><div class="split">
-      <table class="data-table">
-        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
-        <tbody>${data.members.map((m) => `
-          <tr>
-            <td>${esc(m.name)}</td>
-            <td>${esc(m.email)}</td>
-            <td>
-              <select data-member-role="${m.id}">
-                ${data.roles.map((r) => `<option value="${r.id}" ${r.id === m.role ? "selected" : ""}>${esc(r.label)}</option>`).join("")}
-              </select>
-            </td>
-            <td>${m.id !== boot.user.id && m.role !== "owner" ? `<button type="button" class="btn btn--ghost" data-remove-member="${m.id}">Remove</button>` : ""}</td>
-          </tr>
-        `).join("")}</tbody>
-      </table>
+      <div>
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+          <tbody>${data.members.map((m) => `
+            <tr>
+              <td>${esc(m.name)}</td>
+              <td>${esc(m.email)}</td>
+              <td>
+                <select data-member-role="${m.id}">
+                  ${data.roles.map((r) => `<option value="${r.id}" ${r.id === m.role ? "selected" : ""}>${esc(r.label)}</option>`).join("")}
+                </select>
+              </td>
+              <td>${m.id !== boot.user.id && m.role !== "owner" ? `<button type="button" class="btn btn--ghost" data-remove-member="${m.id}">Remove</button>` : ""}</td>
+            </tr>
+          `).join("")}</tbody>
+        </table>
+        ${children ? `<h2 class="section-title">Child workspaces</h2><div class="child-grid">${children}</div>` : ""}
+      </div>
       <form class="side-card" data-ajax="${boot.urls.memberStore}">
-        <h2>Invite</h2>
+        <h2>Invite to ${esc(boot.workspace.name)}</h2>
         <label class="field"><span>Email</span><input type="email" name="email" required></label>
         <label class="field"><span>Name</span><input name="name" placeholder="Optional if they already have an account"></label>
         <label class="field"><span>Role</span>
           <select name="role">${data.invite_roles.map((r) => `<option value="${r}">${esc(r)}</option>`).join("")}</select>
         </label>
         <button class="btn btn--primary" type="submit">Add person</button>
-        <p class="hint">${data.seats} / ${data.seat_limit} seats on ${esc(data.plan_name)}.</p>
+        <p class="hint">${data.seats} / ${data.seat_limit} seats on ${esc(data.plan_name)}. Access stops at this workspace unless you add them to a child.</p>
       </form>
     </div></div>`;
+  }
+
+  function renderLook() {
+    const w = boot.workspace;
+    renderPageChrome("Look", "Accent, sidebar, and logo belong to this workspace. Switching workspaces restores that workspace’s look and its own Build mode.");
+    stage.innerHTML = `<div class="page-body">
+      <form class="split look-form" id="look-form">
+        <div class="side-card">
+          <h2>This workspace</h2>
+          <label class="field"><span>Name</span><input name="name" required value="${esc(w.name)}"></label>
+          <label class="field"><span>Tagline</span><input name="tagline" maxlength="160" value="${esc(w.tagline || "")}" placeholder="Shown to people who belong here"></label>
+          <div class="look-swatches">
+            <label class="field"><span>Accent</span><input type="color" name="brand_color" value="${esc(w.brand_color || "#5190ef")}"></label>
+            <label class="field"><span>Sidebar</span><input type="color" name="sidebar_color" value="${esc(w.sidebar_color || "#fafafa")}"></label>
+          </div>
+          <label class="field"><span>Logo</span><input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+          ${w.logo_url ? `<label class="check"><input type="checkbox" name="remove_logo" value="1"> Remove current logo</label>` : ""}
+          <button class="btn btn--primary" type="submit">Save look</button>
+        </div>
+        <div class="look-preview" id="look-preview">
+          <div class="look-preview__bar">
+            <strong>${esc(w.name)}</strong>
+            <span>${esc(w.tagline || "Your colors, your logo.")}</span>
+          </div>
+          <p class="hint">Use and Build stay on this workspace. A child does not inherit these colors until someone with access sets them there.</p>
+        </div>
+      </form>
+    </div>`;
+    const form = document.getElementById("look-form");
+    const preview = document.getElementById("look-preview");
+    const syncPreview = () => {
+      const accent = form.brand_color.value;
+      const side = form.sidebar_color.value;
+      preview.style.setProperty("--brand", accent);
+      preview.style.setProperty("--sidebar-bg", side);
+      preview.classList.toggle("is-dark", hexLuma(side) < 0.55);
+    };
+    form.brand_color.addEventListener("input", syncPreview);
+    form.sidebar_color.addEventListener("input", syncPreview);
+    syncPreview();
   }
 
   function renderAutomations(data) {
@@ -486,6 +599,8 @@
         renderPlan(await api(boot.urls.plan));
       } else if (kind === "structure") {
         renderStructure(await api(boot.urls.structure));
+      } else if (kind === "look") {
+        renderLook();
       }
     } catch (err) {
       toast(err.message || "Could not open this panel");
@@ -716,6 +831,31 @@
       }
     } catch (err) {
       toast(err.message || "Could not save");
+    }
+  });
+
+  document.addEventListener("submit", async (e) => {
+    const form = e.target.closest("#look-form");
+    if (!form) return;
+    e.preventDefault();
+    const fd = new FormData(form);
+    try {
+      const res = await fetch(boot.urls.look, {
+        method: "POST",
+        headers: { Accept: "application/json", "X-CSRF-TOKEN": boot.urls.csrf, "X-Requested-With": "XMLHttpRequest" },
+        body: fd,
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.message || Object.values(payload.errors || {})[0]?.[0] || "Could not save look");
+      if (payload.boot) boot = payload.boot;
+      toast(payload.status || "Look saved");
+      renderMode();
+      renderWorkspaceMenu();
+      renderUserMenu();
+      renderNav();
+      renderLook();
+    } catch (err) {
+      toast(err.message || "Could not save look");
     }
   });
 

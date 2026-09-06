@@ -18,11 +18,17 @@ class SurfaceController extends Controller
             'surface' => ['required', Rule::in(['builder', 'app'])],
             'workspace_id' => ['nullable', 'integer'],
         ]);
-        $request->session()->put('surface', $data['surface']);
-        if ($data['workspace_id']) {
+        $workspace = null;
+        if (! empty($data['workspace_id'])) {
             $workspace = $this->workspaceForUser($data['workspace_id']);
+        } elseif ($request->session()->get('workspace_id')) {
+            $workspace = $this->workspaceForUser($request->session()->get('workspace_id'));
+        }
+        if ($workspace) {
+            Access::setSurface($workspace, $data['surface']);
+            $request->session()->put('workspace_id', $workspace->id);
             if ($request->expectsJson()) {
-                $workspace->load(['databases.tables', 'dashboards', 'plan', 'members']);
+                $workspace->load(['databases.tables', 'dashboards', 'plan', 'members', 'children']);
 
                 return response()->json(\App\Support\WorkspaceShell::boot($request->user(), $workspace));
             }

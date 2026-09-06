@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
-#[Fillable(['name', 'slug', 'plan_id', 'parent_id'])]
+#[Fillable(['name', 'slug', 'plan_id', 'parent_id', 'tagline', 'brand_color', 'sidebar_color', 'logo_path'])]
 class Workspace extends Model
 {
     public function parent(): BelongsTo
@@ -59,20 +59,44 @@ class Workspace extends Model
         return $this->plan ?? Plan::free();
     }
 
+    public function brandColor(): string
+    {
+        return $this->brand_color ?: '#5190ef';
+    }
+
+    public function sidebarColor(): string
+    {
+        return $this->sidebar_color ?: '#fafafa';
+    }
+
+    public function logoUrl(): ?string
+    {
+        return $this->logo_path ? asset('storage/'.$this->logo_path) : null;
+    }
+
     /**
-     * @return list<array{id: int, name: string, parent_id: int|null, depth: int, children: list<array<string, mixed>>}>
+     * @return array{id: int, name: string, parent_id: int|null, tagline: ?string, brand_color: string, sidebar_color: string, logo_url: ?string}
      */
+    public function brandPayload(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'parent_id' => $this->parent_id,
+            'tagline' => $this->tagline,
+            'brand_color' => $this->brandColor(),
+            'sidebar_color' => $this->sidebarColor(),
+            'logo_url' => $this->logoUrl(),
+        ];
+    }
+
     public static function treeFor(User $user): array
     {
-        $memberships = $user->workspaces()->with(['children', 'parent'])->get();
-        $reachable = collect();
-        foreach ($memberships as $workspace) {
-            $reachable[$workspace->id] = $workspace;
-            foreach (self::descendantsOf($workspace) as $child) {
-                $reachable[$child->id] = $child;
-            }
-        }
-        $byParent = $reachable->groupBy(fn ($ws) => $ws->parent_id ?: 0);
+        $memberships = $user->workspaces()->get()->keyBy('id');
+        $ids = $memberships->keys();
+        $byParent = $memberships->groupBy(function ($ws) use ($ids) {
+            return $ws->parent_id && $ids->contains($ws->parent_id) ? $ws->parent_id : 0;
+        });
 
         $build = function ($parentId, $depth) use (&$build, $byParent) {
             return ($byParent[$parentId] ?? collect())->sortBy('name')->values()->map(function ($ws) use ($build, $depth) {
@@ -81,6 +105,8 @@ class Workspace extends Model
                     'name' => $ws->name,
                     'parent_id' => $ws->parent_id,
                     'depth' => $depth,
+                    'brand_color' => $ws->brandColor(),
+                    'logo_url' => $ws->logoUrl(),
                     'children' => $build($ws->id, $depth + 1),
                 ];
             })->all();
@@ -117,16 +143,6 @@ class Workspace extends Model
             'parent_id' => $parent?->id,
         ]);
         $workspace->members()->attach($user->id, ['role' => 'owner']);
-        if ($parent) {
-            foreach ($parent->members as $member) {
-                if ((int) $member->id === (int) $user->id) {
-                    continue;
-                }
-                $workspace->members()->syncWithoutDetaching([
-                    $member->id => ['role' => $member->pivot->role],
-                ]);
-            }
-        }
 
         return $workspace->fresh(['plan', 'members', 'parent']);
     }

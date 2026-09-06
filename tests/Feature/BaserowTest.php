@@ -7,10 +7,13 @@ use App\Models\RowComment;
 use App\Models\Table;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Access;
 use App\Support\FormulaEngine;
 use App\Support\RowQuery;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class BaserowTest extends TestCase
@@ -131,16 +134,57 @@ class BaserowTest extends TestCase
         $this->seed(DemoSeeder::class);
         $owner = User::query()->where('email', 'demo@baserow.io')->first();
         $member = User::query()->where('email', 'maya@baserow.io')->first();
+        $builder = User::query()->where('email', 'sam@baserow.io')->first();
         $acme = Workspace::query()->where('name', 'Acme Inc')->first();
         $sales = Workspace::query()->where('name', 'Sales')->first();
         $this->assertNotNull($sales);
         $this->assertSame($acme->id, $sales->parent_id);
+        $this->assertTrue($sales->members->contains('id', $owner->id));
+        $this->assertTrue($sales->members->contains('id', $builder->id));
+        $this->assertFalse($sales->members->contains('id', $member->id));
+
+        $this->actingAs($member)->get(route('workspaces.show', $sales))->assertForbidden();
+        $this->actingAs($member)->withSession(['workspace_id' => $sales->id])->getJson(route('app.boot'))
+            ->assertForbidden();
+
+        $opps = Table::query()->where('name', 'Opportunities')->first();
+        $this->actingAs($member)->getJson(route('workspaces.panel.sheet', [$sales, $opps]))->assertForbidden();
+
+        $acmeBoot = $this->actingAs($member)->withSession(['workspace_id' => $acme->id])->getJson(route('app.boot'))
+            ->assertOk()
+            ->assertJsonPath('workspace.name', 'Acme Inc');
+        $this->assertFalse(collect($acmeBoot->json('tree'))->pluck('name')->contains('Sales'));
+
+        $this->actingAs($owner)->getJson(route('workspaces.panel.people', $acme))
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Sales'])
+            ->assertJsonFragment(['email' => 'maya@baserow.io']);
+
+        $this->actingAs($member)->postJson(route('members.child', $acme), [
+            'child_id' => $sales->id,
+            'user_id' => $member->id,
+            'role' => 'member',
+        ])->assertForbidden();
+
+        $stranger = User::factory()->create();
+        $this->actingAs($owner)->postJson(route('members.child', $acme), [
+            'child_id' => $sales->id,
+            'user_id' => $stranger->id,
+            'role' => 'member',
+        ])->assertStatus(422);
+
+        $this->actingAs($owner)->postJson(route('members.child', $acme), [
+            'child_id' => $sales->id,
+            'user_id' => $member->id,
+            'role' => 'member',
+        ])->assertOk();
 
         $this->actingAs($member)->get(route('workspaces.show', $sales))->assertRedirect(route('app'));
         $this->actingAs($member)->withSession(['workspace_id' => $sales->id])->getJson(route('app.boot'))
             ->assertOk()
             ->assertJsonPath('workspace.name', 'Sales')
-            ->assertJsonPath('can_build', false);
+            ->assertJsonPath('can_build', false)
+            ->assertJsonPath('workspace.brand_color', '#0eaa42');
 
         $this->actingAs($owner)->withSession(['workspace_id' => $acme->id])
             ->postJson(route('app.surface'), ['surface' => 'builder'])
@@ -148,17 +192,47 @@ class BaserowTest extends TestCase
             ->assertJsonPath('surface', 'builder')
             ->assertJsonPath('can_build', true);
 
+        $this->actingAs($owner)->withSession([
+            'workspace_id' => $sales->id,
+            Access::surfaceKey($acme) => 'builder',
+        ])->getJson(route('app.boot'))
+            ->assertOk()
+            ->assertJsonPath('workspace.name', 'Sales')
+            ->assertJsonPath('surface', 'app');
+
+        $this->actingAs($owner)->withSession(['workspace_id' => $sales->id])
+            ->postJson(route('app.surface'), ['surface' => 'builder'])
+            ->assertOk()
+            ->assertJsonPath('surface', 'builder');
+
         $table = Table::query()->where('name', 'Clients')->first();
-        $this->actingAs($owner)->withSession(['workspace_id' => $acme->id, 'surface' => 'builder'])
-            ->getJson(route('app.sheet', $table))
+        $this->actingAs($owner)->withSession([
+            'workspace_id' => $acme->id,
+            Access::surfaceKey($acme) => 'builder',
+        ])->getJson(route('app.sheet', $table))
             ->assertOk()
             ->assertJsonPath('bootstrap.canBuild', true);
+
+        Storage::fake('public');
+        $this->actingAs($owner)->post(route('workspaces.look', $sales), [
+            'name' => 'Sales',
+            'tagline' => 'Repainted for the sales pod',
+            'brand_color' => '#c45c26',
+            'sidebar_color' => '#fff7f0',
+            'logo' => UploadedFile::fake()->image('sales-mark.png', 64, 64),
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('workspace.brand_color', '#c45c26')
+            ->assertJsonPath('workspace.tagline', 'Repainted for the sales pod');
+        $this->assertNotNull($sales->fresh()->logo_path);
 
         $this->actingAs($owner)->withSession(['workspace_id' => $acme->id])->postJson(route('workspaces.store'), [
             'name' => 'Marketing',
             'parent_id' => $acme->id,
         ])->assertOk()->assertJsonPath('name', 'Marketing');
-        $this->assertDatabaseHas('workspaces', ['name' => 'Marketing', 'parent_id' => $acme->id]);
+        $marketing = Workspace::query()->where('name', 'Marketing')->first();
+        $this->assertSame($acme->id, $marketing->parent_id);
+        $this->assertFalse($marketing->members()->where('users.id', $member->id)->exists());
     }
 
     public function test_row_query_filters_and_sorts(): void

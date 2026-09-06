@@ -56,7 +56,7 @@ class LoginController extends Controller
         if ($workspace) {
             session(['workspace_id' => $workspace->id]);
             if (! \App\Support\Access::canBuild($user, $workspace)) {
-                session(['surface' => 'app']);
+                \App\Support\Access::setSurface($workspace, 'app');
             }
         }
     }

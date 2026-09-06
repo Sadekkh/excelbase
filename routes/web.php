@@ -56,6 +56,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
     Route::get('/workspace/{workspace}', [WorkspaceController::class, 'show'])->name('workspaces.show');
     Route::patch('/workspace/{workspace}', [WorkspaceController::class, 'update'])->name('workspaces.update');
+    Route::post('/workspace/{workspace}/look', [WorkspaceController::class, 'appearance'])->name('workspaces.look');
     Route::delete('/workspace/{workspace}', [WorkspaceController::class, 'destroy'])->name('workspaces.destroy');
     Route::get('/workspace/{workspace}/boot', [WorkspacePanelController::class, 'boot'])->name('workspaces.panel.boot');
     Route::get('/workspace/{workspace}/panel/sheet/{table}', [WorkspacePanelController::class, 'sheet'])->name('workspaces.panel.sheet');
@@ -71,6 +72,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/workspace/{workspace}/people', [MemberController::class, 'index'])->name('members.index');
     Route::post('/workspace/{workspace}/people', [MemberController::class, 'store'])->name('members.store');
+    Route::post('/workspace/{workspace}/people/child', [MemberController::class, 'addToChild'])->name('members.child');
     Route::patch('/workspace/{workspace}/people/{user}', [MemberController::class, 'update'])->name('members.update');
     Route::delete('/workspace/{workspace}/people/{user}', [MemberController::class, 'destroy'])->name('members.destroy');
 

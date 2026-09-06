@@ -14,26 +14,6 @@ class Access
         if (! $user) {
             return null;
         }
-
-        $current = $workspace;
-        $guard = 0;
-        while ($current && $guard++ < 24) {
-            $role = self::directRole($user, $current);
-            if ($role) {
-                return $role;
-            }
-            $current->loadMissing('parent.members');
-            $current = $current->parent;
-        }
-
-        return null;
-    }
-
-    public static function directRole(?User $user, Workspace $workspace): ?string
-    {
-        if (! $user) {
-            return null;
-        }
         if ($workspace->relationLoaded('members')) {
             return $workspace->members->firstWhere('id', $user->id)?->pivot?->role;
         }
@@ -67,13 +47,23 @@ class Access
         return self::role($user, $workspace) === 'owner';
     }
 
+    public static function surfaceKey(Workspace $workspace): string
+    {
+        return 'surface_'.$workspace->id;
+    }
+
     public static function surface(User $user, Workspace $workspace): string
     {
         if (! self::canBuild($user, $workspace)) {
             return 'app';
         }
 
-        return session('surface', 'app');
+        return session(self::surfaceKey($workspace), 'app');
+    }
+
+    public static function setSurface(Workspace $workspace, string $surface): void
+    {
+        session()->put(self::surfaceKey($workspace), $surface);
     }
 
     public static function label(?string $role): string

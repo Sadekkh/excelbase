@@ -94,9 +94,9 @@ class WorkspacePanelController extends Controller
         if ($data['surface'] === 'builder' && ! Access::canBuild($request->user(), $workspace)) {
             abort(403);
         }
-        $request->session()->put('surface', $data['surface']);
+        Access::setSurface($workspace, $data['surface']);
         $request->session()->put('workspace_id', $workspace->id);
-        $workspace->load(['databases.tables', 'dashboards', 'plan', 'members']);
+        $workspace->load(['databases.tables', 'dashboards', 'plan', 'members', 'children']);
 
         return response()->json(WorkspaceShell::boot($request->user(), $workspace));
     }
@@ -174,7 +174,7 @@ class WorkspacePanelController extends Controller
         if ($data['surface'] === 'builder' && ! Access::canBuild($request->user(), $workspace)) {
             abort(403);
         }
-        $request->session()->put('surface', $data['surface']);
+        Access::setSurface($workspace, $data['surface']);
         $workspace->load(['databases.tables', 'dashboards', 'plan', 'members', 'children']);
 
         return response()->json(WorkspaceShell::boot($request->user(), $workspace));

@@ -2,7 +2,7 @@
 
 A Laravel + Blade SaaS recreation of [Baserow](https://baserow.io). No Vue, React, Alpine, or Livewire. Each **client is a workspace** on a **plan**, with **roles**, a **platform admin**, **dashboards**, and **automations**.
 
-The app stays on `/app`. Workspaces are a tree you switch in the sidebar — you can belong to several, and a workspace can have children. **Use** is the spreadsheet. **Build** stays on the same sheet and turns on structure tools.
+The app stays on `/app`. Each workspace is its own unit: tables, roles, permissions, Build mode, and look (colors + logo). You only see a workspace you belong to. A parent can add people from its roster onto a child — that child still keeps its own seats and roles. **Use** is the spreadsheet. **Build** is per workspace.
 
 ## Surfaces
 
@@ -24,9 +24,9 @@ Password for all: `password`
 
 | Email | Role |
 | --- | --- |
-| `demo@baserow.io` | Platform admin + owner of Acme Inc (Premium) |
-| `sam@baserow.io` | Builder on Acme Inc |
-| `maya@baserow.io` | Member on Acme Inc (user surface) |
+| `demo@baserow.io` | Platform admin + owner of Acme Inc (Premium) and the Sales child |
+| `sam@baserow.io` | Builder on Acme Inc and on Sales |
+| `maya@baserow.io` | Member on Acme Inc only — not on Sales until someone adds her from Acme |
 | `noah@harborpine.com` | Owner of Harbor & Pine (Free client workspace) |
 
 ## Run locally
