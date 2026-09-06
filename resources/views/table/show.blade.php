@@ -1,5 +1,7 @@
 @extends('layouts.app')
-@php($bodyClass = 'app-body')
+@php
+    $bodyClass = 'app-body';
+@endphp
 @section('title', $table->name.' | '.$database->name.' | Baserow')
 @section('content')
 <div class="app" id="app"
@@ -99,21 +101,28 @@
             <div class="views-bar__tabs">
                 @foreach ($table->views as $v)
                     <a href="{{ route('tables.show', ['table' => $table, 'view' => $v->id]) }}"
-                       class="view-tab {{ $v->id === $view->id ? 'is-active' : '' }}">
-                        @include('partials.icon', ['name' => $v->type === 'grid' ? 'grid' : $v->type, 'size' => 14])
+                       class="view-tab {{ $v->id === $view->id ? 'is-active' : '' }} {{ $v->is_personal ? 'is-personal' : '' }}">
+                        @include('partials.icon', ['name' => ($v->type === 'form' && (($v->form_config['mode'] ?? '') === 'survey')) ? 'survey' : ($v->type === 'grid' ? 'grid' : $v->type), 'size' => 14])
                         <span>{{ $v->name }}</span>
+                        @if ($v->is_personal)
+                            @include('partials.icon', ['name' => 'lock', 'size' => 12])
+                        @endif
                     </a>
                 @endforeach
                 <button type="button" class="view-tab view-tab--add" data-menu="add-view">
                     @include('partials.icon', ['name' => 'plus', 'size' => 14])
                 </button>
                 <div class="menu" id="add-view" hidden>
-                    @foreach (['grid' => 'Grid', 'gallery' => 'Gallery', 'kanban' => 'Kanban', 'calendar' => 'Calendar', 'form' => 'Form'] as $type => $label)
+                    @foreach (['grid' => 'Grid', 'gallery' => 'Gallery', 'kanban' => 'Kanban', 'calendar' => 'Calendar', 'timeline' => 'Timeline', 'graph' => 'Graph', 'form' => 'Form', 'survey' => 'Survey'] as $type => $label)
                         <button type="button" data-create-view="{{ $type }}">
                             @include('partials.icon', ['name' => $type, 'size' => 14])
                             {{ $label }}
                         </button>
                     @endforeach
+                    <div class="menu__sep"></div>
+                    <label class="check" style="margin:6px 8px">
+                        <input type="checkbox" id="create-personal"> Personal view (only I can see this)
+                    </label>
                 </div>
             </div>
             <div class="views-bar__meta">
@@ -147,7 +156,7 @@
                 @include('partials.icon', ['name' => 'row-height']) Row height
             </button>
             <div class="menu" id="row-height" hidden>
-                @foreach (['small' => 'Short', 'medium' => 'Medium', 'large' => 'Tall'] as $key => $label)
+                @foreach (['small' => 'Short', 'medium' => 'Medium', 'large' => 'Tall', 'extra_large' => 'Extra tall'] as $key => $label)
                     <button type="button" data-row-height="{{ $key }}" class="{{ $view->row_height === $key ? 'is-active' : '' }}">{{ $label }}</button>
                 @endforeach
             </div>
@@ -166,7 +175,10 @@
             </button>
             <div class="menu" id="share-menu" hidden>
                 <button type="button" data-share-view>Create public link</button>
-                <a href="{{ route('tables.export', $table) }}">Export view CSV</a>
+                <a href="{{ route('tables.export', $table) }}">Export CSV</a>
+                <a href="{{ route('tables.export', [$table, 'format' => 'json']) }}">Export JSON</a>
+                <a href="{{ route('tables.export', [$table, 'format' => 'xml']) }}">Export XML</a>
+                <a href="{{ route('tables.export', [$table, 'format' => 'xls']) }}">Export Excel</a>
             </div>
             <form class="toolbar__search" method="get" action="{{ route('tables.show', $table) }}">
                 <input type="hidden" name="view" value="{{ $view->id }}">
@@ -176,6 +188,7 @@
             <button type="button" class="icon-btn" data-menu="view-menu">@include('partials.icon', ['name' => 'more-v'])</button>
             <div class="menu" id="view-menu" hidden>
                 <button type="button" data-rename="view" data-id="{{ $view->id }}" data-name="{{ $view->name }}">Rename view</button>
+                <button type="button" data-toggle-personal>{{ $view->is_personal ? 'Make collaborative' : 'Make personal' }}</button>
                 <form method="post" action="{{ route('views.duplicate', $view) }}">@csrf<button type="submit">Duplicate view</button></form>
                 <label class="menu__file">Import CSV
                     <input type="file" accept=".csv,text/csv" id="import-csv">

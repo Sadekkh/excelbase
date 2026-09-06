@@ -22,6 +22,10 @@ class FieldTypes
             'email' => ['label' => 'Email', 'icon' => 'email', 'group' => 'text'],
             'phone' => ['label' => 'Phone number', 'icon' => 'phone', 'group' => 'text'],
             'link_row' => ['label' => 'Link to table', 'icon' => 'link', 'group' => 'link'],
+            'lookup' => ['label' => 'Lookup', 'icon' => 'search', 'group' => 'link'],
+            'count' => ['label' => 'Count', 'icon' => 'number', 'group' => 'link'],
+            'formula' => ['label' => 'Formula', 'icon' => 'formula', 'group' => 'number'],
+            'ai' => ['label' => 'AI', 'icon' => 'ai', 'group' => 'text'],
             'file' => ['label' => 'File', 'icon' => 'file', 'group' => 'text'],
             'created_on' => ['label' => 'Created on', 'icon' => 'created', 'group' => 'system'],
             'last_modified' => ['label' => 'Last modified', 'icon' => 'modified', 'group' => 'system'],
@@ -35,7 +39,7 @@ class FieldTypes
 
     public static function isReadOnly(string $type): bool
     {
-        return in_array($type, ['created_on', 'last_modified'], true);
+        return in_array($type, ['created_on', 'last_modified', 'formula', 'ai', 'lookup', 'count'], true);
     }
 
     public static function defaultValue(string $type): mixed
@@ -56,6 +60,10 @@ class FieldTypes
             'rating' => ['max' => 5, 'style' => 'star'],
             'single_select', 'multiple_select' => ['options' => []],
             'link_row' => ['linked_table_id' => null],
+            'lookup' => ['link_field_id' => null, 'lookup_field_id' => null],
+            'count' => ['link_field_id' => null],
+            'formula' => ['formula' => ''],
+            'ai' => ['source_field_id' => null, 'mode' => 'summarize'],
             default => [],
         };
     }

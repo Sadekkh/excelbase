@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 #[Fillable([
     'table_id', 'name', 'type', 'filters', 'sorts', 'groups', 'hidden_fields',
     'field_options', 'form_config', 'row_height', 'public', 'public_slug',
-    'kanban_field_id', 'order',
+    'kanban_field_id', 'order', 'is_personal', 'user_id',
 ])]
 class View extends Model
 {
@@ -24,6 +24,7 @@ class View extends Model
             'field_options' => 'array',
             'form_config' => 'array',
             'public' => 'boolean',
+            'is_personal' => 'boolean',
         ];
     }
 
@@ -59,6 +60,9 @@ class View extends Model
             'kanban' => 'Kanban',
             'form' => 'Form',
             'calendar' => 'Calendar',
+            'timeline' => 'Timeline',
+            'survey' => 'Survey',
+            'graph' => 'Graph',
             default => 'Grid',
         };
     }

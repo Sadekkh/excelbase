@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Database;
 use App\Models\Field;
 use App\Models\Row;
+use App\Models\RowComment;
 use App\Models\Table;
 use App\Models\User;
 use App\Models\View;
@@ -42,16 +43,16 @@ class DemoSeeder extends Seeder
             'order' => 2,
         ]);
 
-        $clients = $this->clientsTable($crm)->load(['fields', 'rows']);
+        $clients = $this->clientsTable($crm, $user)->load(['fields', 'rows']);
         $this->dealsTable($crm, $clients);
-        $this->tasksTable($crm);
+        $this->tasksTable($crm, $user);
         $this->featuresTable($product);
 
         $personal = Workspace::createForUser($user, 'Personal');
         Database::createWithTable($personal, 'Notes', 'Ideas');
     }
 
-    private function clientsTable(Database $database): Table
+    private function clientsTable(Database $database, User $user): Table
     {
         $table = Table::create(['database_id' => $database->id, 'name' => 'Clients', 'order' => 1]);
         $status = $this->selectOptions([
@@ -107,7 +108,7 @@ class DemoSeeder extends Seeder
 
         $this->gridView($table, 'Grid');
         $this->galleryView($table, 'Directory');
-        $kanban = View::create([
+        View::create([
             'table_id' => $table->id,
             'name' => 'Pipeline',
             'type' => 'kanban',
@@ -118,8 +119,35 @@ class DemoSeeder extends Seeder
             'kanban_field_id' => $fields['Status']->id,
             'row_height' => 'small',
             'order' => 3,
+            'user_id' => $user->id,
         ]);
-        unset($kanban);
+        View::create([
+            'table_id' => $table->id,
+            'name' => 'My leads',
+            'type' => 'grid',
+            'is_personal' => true,
+            'user_id' => $user->id,
+            'filters' => [['field_id' => $fields['Status']->id, 'operator' => 'equal', 'value' => $statusIds['Lead']]],
+            'sorts' => [],
+            'groups' => [],
+            'hidden_fields' => [],
+            'field_options' => ['row_color_field_id' => $fields['Status']->id],
+            'row_height' => 'small',
+            'order' => 4,
+        ]);
+        View::create([
+            'table_id' => $table->id,
+            'name' => 'By status',
+            'type' => 'graph',
+            'filters' => [],
+            'sorts' => [],
+            'groups' => [],
+            'hidden_fields' => [],
+            'field_options' => ['graph_field_id' => $fields['Status']->id],
+            'row_height' => 'small',
+            'order' => 5,
+            'user_id' => $user->id,
+        ]);
 
         return $table;
     }
@@ -141,6 +169,7 @@ class DemoSeeder extends Seeder
         ]);
 
         $clientName = $clients->fields()->where('primary', true)->first();
+        $clientEmail = $clients->fields()->where('name', 'Email')->first();
         $clientIds = [];
         foreach ($clients->rows as $clientRow) {
             $clientIds[(string) $clientRow->value($clientName)] = $clientRow->id;
@@ -156,6 +185,15 @@ class DemoSeeder extends Seeder
             ['Owner', 'text', false, 140],
             ['Notes', 'long_text', false, 260],
         ]);
+        $fields = array_merge($fields, $this->createFields($table, [
+            ['Commission', 'formula', false, 140, ['formula' => '{Amount} * 0.1']],
+            ['AI summary', 'ai', false, 240, ['mode' => 'summarize', 'source_field_id' => $fields['Notes']->id]],
+            ['Client email', 'lookup', false, 200, [
+                'link_field_id' => $fields['Client']->id,
+                'lookup_field_id' => $clientEmail?->id,
+            ]],
+            ['# Clients', 'count', false, 110, ['link_field_id' => $fields['Client']->id]],
+        ]));
 
         $stageIds = array_column($stage, 'id', 'value');
         $prioIds = array_column($priority, 'id', 'value');
@@ -215,7 +253,7 @@ class DemoSeeder extends Seeder
         return $table;
     }
 
-    private function tasksTable(Database $database): Table
+    private function tasksTable(Database $database, User $user): Table
     {
         $table = Table::create(['database_id' => $database->id, 'name' => 'Tasks', 'order' => 3]);
         $status = $this->selectOptions([
@@ -229,20 +267,22 @@ class DemoSeeder extends Seeder
             ['Status', 'single_select', false, 150, ['options' => $status]],
             ['Assignee', 'text', false, 150],
             ['Due', 'date', false, 140],
+            ['End', 'date', false, 140],
             ['Done', 'boolean', false, 90],
             ['Details', 'long_text', false, 280],
         ]);
         $ids = array_column($status, 'id', 'value');
         $tasks = [
-            ['Prepare security questionnaire', 'In progress', 'Alex Rivera', '2026-09-12', false, 'Cedarline Health follow-up.'],
-            ['Import freight sample CSV', 'Todo', 'Sam Chen', '2026-09-09', false, '12k rows, watch performance.'],
-            ['Record product demo', 'Review', 'Alex Rivera', '2026-09-08', false, 'Harbor & Pine walkthrough.'],
-            ['Publish changelog', 'Done', 'Sam Chen', '2026-09-04', true, 'Shipped Friday.'],
-            ['Design form for inbound leads', 'Todo', 'Alex Rivera', '2026-09-18', false, 'Public form on the website.'],
-            ['Fix date filter on Deals', 'In progress', 'Sam Chen', '2026-09-10', false, null],
+            ['Prepare security questionnaire', 'In progress', 'Alex Rivera', '2026-09-08', '2026-09-16', false, 'Cedarline Health follow-up.'],
+            ['Import freight sample CSV', 'Todo', 'Sam Chen', '2026-09-09', '2026-09-12', false, '12k rows, watch performance.'],
+            ['Record product demo', 'Review', 'Alex Rivera', '2026-09-06', '2026-09-09', false, 'Harbor & Pine walkthrough.'],
+            ['Publish changelog', 'Done', 'Sam Chen', '2026-09-01', '2026-09-04', true, 'Shipped Friday.'],
+            ['Design form for inbound leads', 'Todo', 'Alex Rivera', '2026-09-14', '2026-09-20', false, 'Public form on the website.'],
+            ['Fix date filter on Deals', 'In progress', 'Sam Chen', '2026-09-07', '2026-09-11', false, null],
         ];
+        $createdRows = [];
         foreach ($tasks as $i => $r) {
-            Row::create([
+            $createdRows[] = Row::create([
                 'table_id' => $table->id,
                 'order' => $i + 1,
                 'data' => [
@@ -250,11 +290,22 @@ class DemoSeeder extends Seeder
                     (string) $fields['Status']->id => $ids[$r[1]],
                     (string) $fields['Assignee']->id => $r[2],
                     (string) $fields['Due']->id => $r[3],
-                    (string) $fields['Done']->id => $r[4],
-                    (string) $fields['Details']->id => $r[5],
+                    (string) $fields['End']->id => $r[4],
+                    (string) $fields['Done']->id => $r[5],
+                    (string) $fields['Details']->id => $r[6],
                 ],
             ]);
         }
+        RowComment::create([
+            'row_id' => $createdRows[0]->id,
+            'user_id' => $user->id,
+            'body' => 'Need the latest SOC 2 packet before we send this to Cedarline.',
+        ]);
+        RowComment::create([
+            'row_id' => $createdRows[0]->id,
+            'user_id' => $user->id,
+            'body' => 'Legal already reviewed the MSA — only the questionnaire is open.',
+        ]);
         $this->gridView($table, 'Grid');
         View::create([
             'table_id' => $table->id,
@@ -284,11 +335,52 @@ class DemoSeeder extends Seeder
                 'submit_text' => 'Submit request',
                 'success_message' => 'Thanks — your task is in the queue.',
                 'cover' => '#5190ef',
+                'mode' => 'form',
+                'hide_branding' => true,
             ],
             'row_height' => 'small',
             'order' => 3,
         ]);
         unset($form);
+        View::create([
+            'table_id' => $table->id,
+            'name' => 'Timeline',
+            'type' => 'timeline',
+            'filters' => [],
+            'sorts' => [],
+            'groups' => [],
+            'hidden_fields' => [],
+            'field_options' => [
+                'start_field_id' => $fields['Due']->id,
+                'end_field_id' => $fields['End']->id,
+            ],
+            'row_height' => 'small',
+            'order' => 4,
+            'user_id' => $user->id,
+        ]);
+        View::create([
+            'table_id' => $table->id,
+            'name' => 'Survey',
+            'type' => 'form',
+            'filters' => [],
+            'sorts' => [],
+            'groups' => [],
+            'hidden_fields' => [$fields['Done']->id, $fields['Status']->id, $fields['End']->id],
+            'public' => true,
+            'public_slug' => 'task-survey',
+            'form_config' => [
+                'title' => 'How can we help?',
+                'description' => 'One question at a time — we will turn this into a task.',
+                'submit_text' => 'Send',
+                'success_message' => 'Got it. Thanks for the details.',
+                'cover' => '#0eaa42',
+                'mode' => 'survey',
+                'hide_branding' => true,
+            ],
+            'row_height' => 'small',
+            'order' => 5,
+            'user_id' => $user->id,
+        ]);
 
         return $table;
     }
@@ -328,6 +420,21 @@ class DemoSeeder extends Seeder
         }
         $this->gridView($table, 'Grid');
         $this->galleryView($table, 'Gallery');
+        View::create([
+            'table_id' => $table->id,
+            'name' => 'Votes',
+            'type' => 'graph',
+            'filters' => [],
+            'sorts' => [],
+            'groups' => [],
+            'hidden_fields' => [],
+            'field_options' => [
+                'graph_field_id' => $fields['Status']->id,
+                'graph_metric_id' => $fields['Votes']->id,
+            ],
+            'row_height' => 'small',
+            'order' => 3,
+        ]);
 
         return $table;
     }
@@ -339,7 +446,9 @@ class DemoSeeder extends Seeder
     private function createFields(Table $table, array $defs): array
     {
         $out = [];
-        foreach ($defs as $i => $def) {
+        $order = (int) $table->fields()->max('order');
+        foreach ($defs as $def) {
+            $order++;
             $field = Field::create([
                 'table_id' => $table->id,
                 'name' => $def[0],
@@ -347,7 +456,7 @@ class DemoSeeder extends Seeder
                 'primary' => $def[2],
                 'width' => $def[3],
                 'options' => $def[4] ?? FieldTypes::defaultOptions($def[1]),
-                'order' => $i + 1,
+                'order' => $order,
             ]);
             $out[$def[0]] = $field;
         }

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\FieldController;
@@ -62,6 +63,8 @@ Route::middleware('auth')->group(function () {
     Route::patch('/rows/{row}', [RowController::class, 'update'])->name('rows.update');
     Route::delete('/rows/{row}', [RowController::class, 'destroy'])->name('rows.destroy');
     Route::post('/rows/{row}/duplicate', [RowController::class, 'duplicate'])->name('rows.duplicate');
+    Route::get('/rows/{row}/comments', [CommentController::class, 'index'])->name('comments.index');
+    Route::post('/rows/{row}/comments', [CommentController::class, 'store'])->name('comments.store');
 
     Route::post('/table/{table}/views', [ViewController::class, 'store'])->name('views.store');
     Route::patch('/views/{view}', [ViewController::class, 'update'])->name('views.update');

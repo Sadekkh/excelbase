@@ -22,6 +22,7 @@ class PublicShareController extends Controller
         }
 
         $table = $view->table;
+        $table->rows->each(fn ($row) => $row->setRelation('table', $table));
         $rows = RowQuery::apply($table->rows, $view, $table->fields);
 
         $bootstrap = [
@@ -56,8 +57,10 @@ class PublicShareController extends Controller
                 'row_height' => $view->row_height,
                 'public' => true,
                 'public_slug' => $view->public_slug,
+                'is_personal' => false,
                 'kanban_field_id' => $view->kanban_field_id,
             ],
+            'me' => null,
             'fields' => $table->fields->map(fn ($f) => [
                 'id' => $f->id,
                 'name' => $f->name,
@@ -80,6 +83,7 @@ class PublicShareController extends Controller
                 'name' => $t->name,
             ])->values(),
             'linkedRows' => self::linkedRows($table),
+            'linkedFields' => [],
             'routes' => [
                 'field' => '#',
                 'row' => '#',

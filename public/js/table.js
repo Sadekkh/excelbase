@@ -35,6 +35,13 @@
     "chevron-right": "M9.5 7 14.5 12 9.5 17",
     link: "M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6L16 13M14 10a4 4 0 0 1 0 5.6l-2 2a4 4 0 1 1-5.6-5.6L8 10",
     file: "M7 3.5h7l5 5V20H7zM14 3.5V9h5",
+    formula: "M6 5h12M8 5v14M6 19h5M14 12h4M16 10v4",
+    ai: "M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z",
+    search: "M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM16 16.5 20 20.5",
+    graph: "M5 19V9M11 19V5M17 19v-7M3 19h18",
+    survey: "M5 4h14v16H5zM8 8h8M8 12h8M8 16h5",
+    timeline: "M4 12h16M7 8v8M17 8v8M12 6v12",
+    comment: "M5 5h14v10H9l-4 4z",
   };
 
   function icon(name, size = 14) {
@@ -185,6 +192,8 @@
     if (state.view.type === "gallery") return renderGallery();
     if (state.view.type === "kanban") return renderKanban();
     if (state.view.type === "calendar") return renderCalendar();
+    if (state.view.type === "timeline") return renderTimeline();
+    if (state.view.type === "graph") return renderGraph();
     if (state.view.type === "form") return renderForm();
     return renderGrid();
   }
@@ -345,6 +354,99 @@
     stage.querySelector("[data-cal='1']").onclick = () => { calendarCursor.setMonth(calendarCursor.getMonth() + 1); renderCalendar(); };
   }
 
+  function renderTimeline() {
+    const dates = state.fields.filter((f) => f.type === "date");
+    const start = fieldById(state.view.field_options?.start_field_id) || dates[0];
+    const end = fieldById(state.view.field_options?.end_field_id) || dates[1] || dates[0];
+    const primary = state.fields.find((f) => f.primary);
+    if (!start) {
+      stage.innerHTML = `<div class="empty-state" style="margin:24px"><h2>Timeline needs a date field</h2><p>Add a start date (and optionally an end date) to plot bars.</p></div>`;
+      return;
+    }
+    const parsed = state.rows.map((row) => {
+      const s = Date.parse(row.values[start.id] || "") || null;
+      const e = Date.parse((end && row.values[end.id]) || row.values[start.id] || "") || s;
+      return { row, s, e };
+    }).filter((x) => x.s);
+    const min = parsed.length ? Math.min(...parsed.map((x) => x.s)) : Date.now();
+    const max = parsed.length ? Math.max(...parsed.map((x) => x.e || x.s)) : min + 86400000 * 14;
+    const span = Math.max(max - min, 86400000);
+    stage.innerHTML = `<div class="timeline">
+      <div class="timeline__tools">
+        <label>Start <select id="tl-start">${dates.map((f) => `<option value="${f.id}" ${f.id === start.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></label>
+        <label>End <select id="tl-end">${dates.map((f) => `<option value="${f.id}" ${end && f.id === end.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></label>
+      </div>
+      ${parsed.map(({ row, s, e }) => {
+        const left = ((s - min) / span) * 100;
+        const width = Math.max(3, (((e || s) - s) / span) * 100);
+        return `<div class="timeline__row" data-open-row="${row.id}">
+          <strong>${esc(display(primary, row.values[primary.id]) || "Untitled")}</strong>
+          <div class="timeline__track"><div class="timeline__bar" style="left:${left}%;width:${width}%"></div></div>
+        </div>`;
+      }).join("") || `<div class="empty-state"><p>No dated rows yet.</p></div>`}
+    </div>`;
+    stage.querySelector("#tl-start").onchange = async (ev) => {
+      state.view.field_options = { ...(state.view.field_options || {}), start_field_id: Number(ev.target.value) };
+      await saveView({ field_options: state.view.field_options });
+      renderTimeline();
+    };
+    stage.querySelector("#tl-end").onchange = async (ev) => {
+      state.view.field_options = { ...(state.view.field_options || {}), end_field_id: Number(ev.target.value) };
+      await saveView({ field_options: state.view.field_options });
+      renderTimeline();
+    };
+  }
+
+  function renderGraph() {
+    const cats = state.fields.filter((f) => f.type === "single_select");
+    const nums = state.fields.filter((f) => f.type === "number" || f.type === "rating");
+    const cat = fieldById(state.view.field_options?.graph_field_id) || cats[0];
+    const metric = fieldById(state.view.field_options?.graph_metric_id);
+    if (!cat) {
+      stage.innerHTML = `<div class="empty-state" style="margin:24px"><h2>Graph needs a single select field</h2><p>Add a single select to chart counts or totals.</p></div>`;
+      return;
+    }
+    const options = cat.options?.options || [];
+    const buckets = options.map((opt) => {
+      const rows = state.rows.filter((r) => String(r.values[cat.id] || "") === String(opt.id));
+      const value = metric
+        ? rows.reduce((sum, row) => sum + (Number(row.values[metric.id]) || 0), 0)
+        : rows.length;
+      return { opt, value, count: rows.length };
+    });
+    const max = Math.max(1, ...buckets.map((b) => b.value));
+    stage.innerHTML = `<div class="graph">
+      <div class="graph__tools">
+        <label>Group by <select id="graph-cat">${cats.map((f) => `<option value="${f.id}" ${f.id === cat.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></label>
+        <label>Value <select id="graph-metric">
+          <option value="">Count of rows</option>
+          ${nums.map((f) => `<option value="${f.id}" ${metric && f.id === metric.id ? "selected" : ""}>Sum of ${esc(f.name)}</option>`).join("")}
+        </select></label>
+      </div>
+      <div class="graph__bars">
+        ${buckets.map((b) => {
+          const c = colorOf(b.opt.color);
+          const h = Math.round((b.value / max) * 180);
+          return `<div class="graph__col">
+            <div class="graph__value">${esc(String(b.value))}</div>
+            <div class="graph__bar" style="height:${h}px;background:${c.text}"></div>
+            <div class="graph__label">${esc(b.opt.value)}</div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+    stage.querySelector("#graph-cat").onchange = async (ev) => {
+      state.view.field_options = { ...(state.view.field_options || {}), graph_field_id: Number(ev.target.value) };
+      await saveView({ field_options: state.view.field_options });
+      renderGraph();
+    };
+    stage.querySelector("#graph-metric").onchange = async (ev) => {
+      state.view.field_options = { ...(state.view.field_options || {}), graph_metric_id: ev.target.value ? Number(ev.target.value) : null };
+      await saveView({ field_options: state.view.field_options });
+      renderGraph();
+    };
+  }
+
   function renderForm() {
     const cfg = state.view.form_config || {};
     const hidden = new Set((state.view.hidden_fields || []).map(Number));
@@ -357,7 +459,7 @@
         <div class="public-form">
           <div class="public-form__cover" style="background:${esc(cfg.cover || "#5190ef")}"></div>
           <div class="public-form__card">
-            <div class="public-form__brand">${icon("text", 18)} Baserow</div>
+            ${cfg.hide_branding ? "" : `<div class="public-form__brand">${icon("text", 18)} Baserow</div>`}
             <h1>${esc(cfg.title || state.table.name)}</h1>
             <p class="public-form__desc">${esc(cfg.description || "")}</p>
             <div class="public-form__fields">
@@ -374,6 +476,8 @@
         <label class="field"><span>Submit button</span><input id="form-submit" value="${esc(cfg.submit_text || "Submit")}"></label>
         <label class="field"><span>Success message</span><input id="form-success" value="${esc(cfg.success_message || "Thank you for submitting!")}"></label>
         <label class="field"><span>Cover color</span><input id="form-cover" type="color" value="${cfg.cover || "#5190ef"}"></label>
+        <label class="check"><input type="checkbox" id="form-survey" ${cfg.mode === "survey" ? "checked" : ""}> Survey mode (one question at a time)</label>
+        <label class="check"><input type="checkbox" id="form-branding" ${cfg.hide_branding ? "checked" : ""}> Hide Baserow branding</label>
         <h3>Visible fields</h3>
         ${state.fields.filter((f) => !f.read_only).map((f) => `
           <label class="check"><input type="checkbox" data-form-field="${f.id}" ${hidden.has(Number(f.id)) ? "" : "checked"}> ${esc(f.name)}</label>
@@ -414,11 +518,16 @@
 
   async function updateRow(id, values) {
     const row = state.rows.find((r) => r.id === id);
+    if (!row) return;
     Object.assign(row.values, values);
     render();
-    const updated = await api(`${state.routes.row}/${id}`, { method: "PATCH", body: JSON.stringify({ values }) });
-    Object.assign(row, updated);
-    render();
+    try {
+      const updated = await api(`${state.routes.row}/${id}`, { method: "PATCH", body: JSON.stringify({ values }) });
+      Object.assign(row, updated);
+      render();
+    } catch (err) {
+      toast(err.message || "Could not save row");
+    }
   }
 
   async function addRow(preset = {}) {
@@ -568,7 +677,42 @@
             <span>${esc(f.name)}</span>
             ${drawerControl(f, row.values[f.id], row.id)}
           </label>`).join("")}
+        ${readOnly ? "" : `<div class="comments">
+          <h3>${icon("comment", 14)} Comments</h3>
+          <div id="comment-list"><p class="hint">Loading comments…</p></div>
+          <form class="comment-form" id="comment-form" data-row="${row.id}">
+            <textarea name="body" rows="2" required placeholder="Write a comment"></textarea>
+            <button type="submit" class="btn btn--primary">Comment</button>
+          </form>
+        </div>`}
       </div>`;
+    if (!readOnly) loadComments(rowId);
+  }
+
+  async function loadComments(rowId) {
+    const box = document.getElementById("comment-list");
+    if (!box) return;
+    try {
+      const data = await api(`${state.routes.row}/${rowId}/comments`);
+      const items = data.comments || [];
+      box.innerHTML = items.length
+        ? items.map((c) => `<article class="comment"><strong>${esc(c.author)}</strong><time>${esc((c.created_at || "").slice(0, 16).replace("T", " "))}</time><p>${esc(c.body)}</p></article>`).join("")
+        : `<p class="hint">No comments yet. Start the thread.</p>`;
+    } catch (_) {
+      box.innerHTML = `<p class="hint">Could not load comments.</p>`;
+    }
+    const form = document.getElementById("comment-form");
+    if (form) {
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const body = form.querySelector("textarea").value.trim();
+        if (!body) return;
+        await api(`${state.routes.row}/${rowId}/comments`, { method: "POST", body: JSON.stringify({ body }) });
+        form.reset();
+        loadComments(rowId);
+        toast("Comment added");
+      };
+    }
   }
 
   function drawerControl(field, value, rowId) {
@@ -640,6 +784,48 @@
         optionsBox.innerHTML = `<label class="field"><span>Link to table</span>
           <select name="linked_table_id">${tables.filter((t) => t.id !== state.table.id).map((t) =>
             `<option value="${t.id}" ${Number(t.id) === Number(currentId) ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>`;
+      } else if (type === "lookup" || type === "count") {
+        const links = (state.fields || []).filter((f) => f.type === "link_row");
+        if (!links.length) {
+          optionsBox.innerHTML = `<p class="hint">Add a Link to table field first, then you can look up or count related rows.</p>`;
+          return;
+        }
+        const selectedLink = Number(current?.options?.link_field_id || links[0].id);
+        const linkField = links.find((f) => Number(f.id) === selectedLink) || links[0];
+        const remote = (state.linkedFields && state.linkedFields[linkField.options?.linked_table_id]) || [];
+        optionsBox.innerHTML = `<label class="field"><span>Link field</span>
+          <select name="link_field_id" id="lookup-link">${links.map((f) => `<option value="${f.id}" ${Number(f.id) === selectedLink ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></label>
+          ${type === "lookup" ? `<label class="field"><span>Field on the linked table</span>
+            <select name="lookup_field_id">${remote.map((f) => `<option value="${f.id}" ${Number(current?.options?.lookup_field_id) === f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></label>` : ""}`;
+        document.getElementById("lookup-link")?.addEventListener("change", (ev) => {
+          paintOptions(type, { ...(current || {}), options: { ...(current?.options || {}), link_field_id: Number(ev.target.value) } });
+        });
+      } else if (type === "formula") {
+        optionsBox.innerHTML = `<label class="field"><span>Formula</span>
+          <input name="formula" id="formula-input" value="${esc(current?.options?.formula || "")}" placeholder="UPPER({Name}) or {Amount} * 0.1"></label>
+          <label class="field"><span>Generate with AI</span>
+            <input id="formula-prompt" placeholder="Commission is 10% of Amount"></label>
+          <button type="button" class="btn btn--ghost" id="formula-ai">Generate formula</button>
+          <p class="hint">Use {Field name}. Functions: UPPER, LOWER, LEN, CONCAT, IF. Math: + − * /</p>`;
+        document.getElementById("formula-ai")?.addEventListener("click", () => {
+          const prompt = document.getElementById("formula-prompt").value;
+          document.getElementById("formula-input").value = generateFormula(prompt);
+        });
+      } else if (type === "ai") {
+        const sources = (state.fields || []).filter((f) => !f.read_only);
+        const currentMode = current?.options?.mode || current?.options?.ai_mode || "summarize";
+        optionsBox.innerHTML = `<label class="field"><span>Source field</span>
+          <select name="source_field_id">
+            <option value="">Entire row</option>
+            ${sources.map((f) => `<option value="${f.id}" ${Number(current?.options?.source_field_id) === f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}
+          </select></label>
+          <label class="field"><span>AI mode</span>
+          <select name="ai_mode">
+            <option value="summarize" ${currentMode === "summarize" ? "selected" : ""}>Summarize</option>
+            <option value="classify" ${currentMode === "classify" ? "selected" : ""}>Classify (positive / negative / neutral)</option>
+            <option value="extract_email" ${currentMode === "extract_email" ? "selected" : ""}>Extract email</option>
+          </select></label>
+          <p class="hint">Runs locally — no API key. Premium-style AI field without sending data out.</p>`;
       } else {
         optionsBox.innerHTML = "";
       }
@@ -697,18 +883,56 @@
         payload.options = { include_time: fd.has("include_time"), format: "ISO" };
       } else if (type === "link_row") {
         payload.options = { linked_table_id: Number(fd.get("linked_table_id")) };
+      } else if (type === "formula") {
+        payload.options = { formula: fd.get("formula") || "" };
+      } else if (type === "ai") {
+        payload.options = { source_field_id: fd.get("source_field_id") ? Number(fd.get("source_field_id")) : null, mode: fd.get("ai_mode") || "summarize" };
+      } else if (type === "lookup") {
+        payload.options = { link_field_id: Number(fd.get("link_field_id")), lookup_field_id: Number(fd.get("lookup_field_id")) };
+      } else if (type === "count") {
+        payload.options = { link_field_id: Number(fd.get("link_field_id")) };
       }
-      if (existing) {
-        const updated = await api(`${state.routes.field}/${existing.id}`, { method: "PATCH", body: JSON.stringify(payload) });
-        Object.assign(existing, updated);
-      } else {
-        const created = await api(state.urls.fields, { method: "POST", body: JSON.stringify(payload) });
-        state.fields.push(created);
+      try {
+        if (existing) {
+          const updated = await api(`${state.routes.field}/${existing.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+          Object.assign(existing, updated);
+        } else {
+          const created = await api(state.urls.fields, { method: "POST", body: JSON.stringify(payload) });
+          state.fields.push(created);
+        }
+        root.innerHTML = "";
+        if (["formula", "ai", "lookup", "count"].includes(type)) {
+          location.reload();
+          return;
+        }
+        render();
+        toast(existing ? "Field updated" : "Field created");
+      } catch (err) {
+        toast(err.message || "Could not save field");
       }
-      root.innerHTML = "";
-      render();
-      toast(existing ? "Field updated" : "Field created");
     };
+  }
+
+  function generateFormula(prompt) {
+    const list = (state.fields || []).filter((f) => !["formula", "ai"].includes(f.type));
+    if (!list.length) return "";
+    const needle = (prompt || "").toLowerCase();
+    const named = list.filter((f) => needle.includes(f.name.toLowerCase()));
+    const first = named[0] || list[0];
+    const numbers = list.filter((f) => f.type === "number" || f.type === "rating");
+    if (/upper|caps|uppercase/.test(needle)) return `UPPER({${first.name}})`;
+    if (/lower|lowercase/.test(needle)) return `LOWER({${first.name}})`;
+    if (/\blen\b|length|characters/.test(needle)) return `LEN({${first.name}})`;
+    if (/concat|combine|join|merge/.test(needle) && (named.length >= 2 || list.length >= 2)) {
+      const a = named[0] || list[0];
+      const b = named[1] || list[1];
+      return `CONCAT({${a.name}}, " ", {${b.name}})`;
+    }
+    if (/percent|commission|10%|0\.1/.test(needle) && numbers[0]) return `{${numbers[0].name}} * 0.1`;
+    if (/\*|times|multipl|product/.test(needle) && numbers.length >= 2) return `{${numbers[0].name}} * {${numbers[1].name}}`;
+    if (/\+|plus|sum|add/.test(needle) && numbers.length >= 2) return `{${numbers[0].name}} + {${numbers[1].name}}`;
+    if (/if|when|greater|above/.test(needle) && numbers[0]) return `IF({${numbers[0].name}}>0, "Yes", "No")`;
+    return `UPPER({${first.name}})`;
   }
 
   function renderPanel(name) {
@@ -801,9 +1025,16 @@
       const form = document.createElement("form");
       form.method = "post";
       form.action = state.urls.views;
-      form.innerHTML = `<input name="_token" value="${state.csrf}"><input name="type" value="${createView.dataset.createView}">`;
+      const personal = document.getElementById("create-personal")?.checked ? `<input name="is_personal" value="1">` : "";
+      form.innerHTML = `<input name="_token" value="${state.csrf}"><input name="type" value="${createView.dataset.createView}">${personal}`;
       document.body.appendChild(form);
       form.submit();
+      return;
+    }
+    const togglePersonal = e.target.closest("[data-toggle-personal]");
+    if (togglePersonal) {
+      await saveView({ is_personal: !state.view.is_personal });
+      location.reload();
       return;
     }
     const filterAdd = e.target.closest("[data-filter-add]");
@@ -896,6 +1127,8 @@
           submit_text: document.getElementById("form-submit").value,
           success_message: document.getElementById("form-success").value,
           cover: document.getElementById("form-cover").value,
+          mode: document.getElementById("form-survey")?.checked ? "survey" : "form",
+          hide_branding: !!document.getElementById("form-branding")?.checked,
         },
       });
       toast("Form saved");

@@ -53,7 +53,33 @@ class TableController extends Controller
             $table->load('views');
         }
 
+        $userId = (int) $request->user()->id;
+        $visibleViews = $table->views
+            ->filter(fn ($item) => ! $item->is_personal || (int) $item->user_id === $userId)
+            ->values();
+        $table->setRelation('views', $visibleViews);
+
+        if (! $view || ($view->is_personal && (int) $view->user_id !== $userId) || ! $visibleViews->contains('id', $view->id)) {
+            $view = $visibleViews->first();
+        }
+
+        if (! $view) {
+            $view = $table->views()->create([
+                'name' => 'Grid',
+                'type' => 'grid',
+                'filters' => [],
+                'sorts' => [],
+                'groups' => [],
+                'hidden_fields' => [],
+                'row_height' => 'small',
+                'order' => 1,
+                'user_id' => $userId,
+            ]);
+            $table->setRelation('views', collect([$view]));
+        }
+
         $search = $request->string('search')->toString() ?: null;
+        $table->rows->each(fn ($row) => $row->setRelation('table', $table));
         $rows = RowQuery::apply($table->rows, $view, $table->fields, $search);
 
         $table->database->workspace->load(['databases.tables']);
@@ -75,6 +101,10 @@ class TableController extends Controller
                 'formPublic' => $view->public_slug && $view->type === 'form' ? route('forms.public', $view->public_slug) : null,
                 'shared' => $view->public_slug ? route('views.shared', $view->public_slug) : null,
                 'upload' => route('files.store'),
+                'comments' => url('/rows'),
+                'exportJson' => route('tables.export', [$table, 'format' => 'json']),
+                'exportXml' => route('tables.export', [$table, 'format' => 'xml']),
+                'exportXls' => route('tables.export', [$table, 'format' => 'xls']),
             ],
             'table' => [
                 'id' => $table->id,
@@ -93,7 +123,13 @@ class TableController extends Controller
                 'row_height' => $view->row_height,
                 'public' => $view->public,
                 'public_slug' => $view->public_slug,
+                'is_personal' => $view->is_personal,
+                'user_id' => $view->user_id,
                 'kanban_field_id' => $view->kanban_field_id,
+            ],
+            'me' => [
+                'id' => $request->user()->id,
+                'name' => $request->user()->name,
             ],
             'fields' => $table->fields->map(fn ($f) => [
                 'id' => $f->id,
@@ -117,6 +153,13 @@ class TableController extends Controller
                 'name' => $t->name,
             ])->values(),
             'linkedRows' => PublicShareController::linkedRows($table->database->loadMissing(['tables.fields', 'tables.rows'])),
+            'linkedFields' => $table->database->tables->mapWithKeys(fn ($sibling) => [
+                $sibling->id => $sibling->fields->map(fn ($field) => [
+                    'id' => $field->id,
+                    'name' => $field->name,
+                    'type' => $field->type,
+                ])->values(),
+            ]),
             'readOnly' => false,
             'routes' => [
                 'field' => url('/fields'),
@@ -177,24 +220,57 @@ class TableController extends Controller
             : redirect()->route('tables.show', $copy);
     }
 
-    public function export(Table $table): StreamedResponse
+    public function export(Request $request, Table $table)
     {
         $this->tableForUser($table);
         $fields = $table->fields;
-        $filename = \Illuminate\Support\Str::slug($table->name).'.csv';
+        $table->rows->each(fn ($row) => $row->setRelation('table', $table));
+        $rows = $table->rows()->orderBy('order')->get();
+        $rows->each(fn ($row) => $row->setRelation('table', $table));
+        $slug = \Illuminate\Support\Str::slug($table->name);
+        $format = $request->query('format', 'csv');
 
-        return response()->streamDownload(function () use ($table, $fields) {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, $fields->pluck('name')->all());
-            foreach ($table->rows()->orderBy('order')->get() as $row) {
-                $line = [];
-                foreach ($fields as $field) {
-                    $line[] = RowQuery::display($row, $field);
+        $matrix = $rows->map(function ($row) use ($fields) {
+            $line = [];
+            foreach ($fields as $field) {
+                $line[$field->name] = RowQuery::display($row, $field);
+            }
+
+            return $line;
+        })->values();
+
+        if ($format === 'json') {
+            return response()->json($matrix)->header('Content-Disposition', "attachment; filename=\"{$slug}.json\"");
+        }
+
+        if ($format === 'xml') {
+            $xml = new \SimpleXMLElement('<table/>');
+            $xml->addAttribute('name', $table->name);
+            foreach ($matrix as $line) {
+                $item = $xml->addChild('row');
+                foreach ($line as $key => $value) {
+                    $item->addChild(\Illuminate\Support\Str::slug($key, '_'), htmlspecialchars((string) $value));
                 }
-                fputcsv($out, $line);
+            }
+
+            return response($xml->asXML(), 200, [
+                'Content-Type' => 'application/xml',
+                'Content-Disposition' => "attachment; filename=\"{$slug}.xml\"",
+            ]);
+        }
+
+        $delimiter = $format === 'xls' ? "\t" : ',';
+        $ext = $format === 'xls' ? 'xls' : 'csv';
+        $mime = $format === 'xls' ? 'application/vnd.ms-excel' : 'text/csv';
+
+        return response()->streamDownload(function () use ($fields, $matrix, $delimiter) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, $fields->pluck('name')->all(), $delimiter);
+            foreach ($matrix as $line) {
+                fputcsv($out, array_values($line), $delimiter);
             }
             fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv']);
+        }, "{$slug}.{$ext}", ['Content-Type' => $mime]);
     }
 
     public function import(Request $request, Table $table)

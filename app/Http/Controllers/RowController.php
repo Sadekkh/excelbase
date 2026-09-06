@@ -45,8 +45,10 @@ class RowController extends Controller
             }
         }
         $row->save();
+        $fresh = $row->fresh();
+        $fresh->setRelation('table', $table->loadMissing('fields'));
 
-        return response()->json($row->fresh()->toApi($fields), 201);
+        return response()->json($fresh->toApi($fields), 201);
     }
 
     public function update(Request $request, Row $row)
@@ -67,8 +69,11 @@ class RowController extends Controller
         }
 
         $row->save();
+        $fresh = $row->fresh();
+        $table = $row->table->loadMissing('fields');
+        $fresh->setRelation('table', $table);
 
-        return response()->json($row->fresh()->toApi($fields));
+        return response()->json($fresh->toApi($table->fields));
     }
 
     public function destroy(Row $row)
@@ -102,6 +107,8 @@ class RowController extends Controller
             'data' => $row->data,
             'order' => $order,
         ]);
+
+        $copy->setRelation('table', $row->table->loadMissing('fields'));
 
         return response()->json($copy->toApi($row->table->fields), 201);
     }

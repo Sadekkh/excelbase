@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Database;
+use App\Models\RowComment;
 use App\Models\Table;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\FormulaEngine;
 use App\Support\RowQuery;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -167,5 +169,109 @@ class BaserowTest extends TestCase
         $database = Database::query()->where('name', 'Inventory')->first();
         $this->assertNotNull($database);
         $this->assertSame('Table', $database->tables()->first()->name);
+    }
+
+    public function test_formula_lookup_count_and_ai_fields(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $table = Table::query()->where('name', 'Deals')->first();
+        $table->load(['fields', 'rows']);
+        $table->rows->each(fn ($row) => $row->setRelation('table', $table));
+
+        $amount = $table->fields->firstWhere('name', 'Amount');
+        $commission = $table->fields->firstWhere('name', 'Commission');
+        $lookup = $table->fields->firstWhere('name', 'Client email');
+        $count = $table->fields->firstWhere('name', 'Count');
+        $count = $count ?: $table->fields->firstWhere('name', '# Clients');
+        $ai = $table->fields->firstWhere('name', 'AI summary');
+        $this->assertNotNull($commission);
+        $this->assertNotNull($lookup);
+        $this->assertNotNull($count);
+        $this->assertNotNull($ai);
+
+        $won = $table->rows->first(fn ($row) => $row->rawValue($table->fields->firstWhere('name', 'Name')) === 'Renewal 2026');
+        $this->assertNotNull($won);
+        $this->assertSame('1200', $won->value($commission));
+        $this->assertSame('ava@northwindlabs.io', $won->value($lookup));
+        $this->assertSame(1, $won->value($count));
+        $this->assertNotSame('', $won->value($ai));
+
+        $generated = FormulaEngine::generate('Commission is 10% of Amount', $table->fields);
+        $this->assertSame('{Amount} * 0.1', $generated);
+    }
+
+    public function test_row_comments_and_export_formats(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $user = User::query()->where('email', 'demo@baserow.io')->first();
+        $table = Table::query()->where('name', 'Tasks')->first();
+        $row = $table->rows()->first();
+
+        $this->actingAs($user)->getJson(route('comments.index', $row))
+            ->assertOk()
+            ->assertJsonFragment(['body' => 'Need the latest SOC 2 packet before we send this to Cedarline.']);
+
+        $this->actingAs($user)->postJson(route('comments.store', $row), [
+            'body' => 'Ship it tomorrow.',
+        ])->assertCreated()->assertJsonPath('body', 'Ship it tomorrow.');
+
+        $this->assertSame(3, RowComment::query()->where('row_id', $row->id)->count());
+
+        $this->actingAs($user)->get(route('tables.export', ['table' => $table, 'format' => 'json']))
+            ->assertOk()
+            ->assertHeader('content-disposition');
+        $this->actingAs($user)->get(route('tables.export', ['table' => $table, 'format' => 'xml']))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/xml');
+    }
+
+    public function test_survey_form_and_timeline_view(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $user = User::query()->where('email', 'demo@baserow.io')->first();
+        $table = Table::query()->where('name', 'Tasks')->first();
+
+        $this->get('/form/task-survey')
+            ->assertOk()
+            ->assertSee('How can we help?')
+            ->assertSee('survey-next')
+            ->assertDontSee('public-form__brand', false);
+
+        $this->actingAs($user)
+            ->get(route('tables.show', ['table' => $table, 'view' => $table->views()->where('type', 'timeline')->value('id')]))
+            ->assertOk()
+            ->assertSee('Timeline');
+
+        $this->actingAs($user)->post(route('views.store', $table), [
+            'type' => 'graph',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('views', ['table_id' => $table->id, 'type' => 'graph']);
+    }
+
+    public function test_personal_views_are_hidden_from_teammates(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $owner = User::query()->where('email', 'demo@baserow.io')->first();
+        $teammate = User::factory()->create();
+        $workspace = Workspace::query()->where('name', 'Acme Inc')->first();
+        $workspace->members()->attach($teammate->id, ['role' => 'admin']);
+        $table = Table::query()->where('name', 'Clients')->first();
+        $personal = $table->views()->where('is_personal', true)->first();
+        $this->assertNotNull($personal);
+
+        $this->actingAs($owner)
+            ->get(route('tables.show', ['table' => $table, 'view' => $personal->id]))
+            ->assertOk()
+            ->assertSee('My leads');
+
+        $this->actingAs($teammate)
+            ->get(route('tables.show', ['table' => $table, 'view' => $personal->id]))
+            ->assertOk()
+            ->assertDontSee('My leads');
+
+        $this->actingAs($teammate)
+            ->patchJson(route('views.update', $personal), ['name' => 'Hacked'])
+            ->assertForbidden();
     }
 }

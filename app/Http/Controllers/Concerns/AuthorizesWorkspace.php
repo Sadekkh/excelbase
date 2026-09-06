@@ -58,6 +58,9 @@ trait AuthorizesWorkspace
     {
         $view->loadMissing('table.database');
         $this->tableForUser($view->table);
+        if ($view->is_personal && (int) $view->user_id !== (int) auth()->id()) {
+            throw new AuthorizationException;
+        }
 
         return $view;
     }

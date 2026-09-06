@@ -22,7 +22,7 @@ class Row extends Model
         return $this->belongsTo(Table::class);
     }
 
-    public function value(Field $field): mixed
+    public function rawValue(Field $field): mixed
     {
         if ($field->type === 'created_on') {
             return $this->created_at?->toIso8601String();
@@ -32,6 +32,77 @@ class Row extends Model
         }
 
         return $this->data[(string) $field->id] ?? $this->data[$field->id] ?? null;
+    }
+
+    public function value(Field $field): mixed
+    {
+        $parent = $this->parentTable();
+        $fields = $parent?->relationLoaded('fields')
+            ? $parent->fields
+            : ($parent?->fields ?? collect());
+
+        return match ($field->type) {
+            'formula' => \App\Support\FormulaEngine::evaluate($this, $field, $fields),
+            'ai' => \App\Support\FormulaEngine::ai($this, $field, $fields),
+            'lookup' => $this->lookupValue($field),
+            'count' => $this->countValue($field),
+            default => $this->rawValue($field),
+        };
+    }
+
+    public function parentTable(): ?Table
+    {
+        if ($this->relationLoaded('table')) {
+            $related = $this->getRelation('table');
+
+            return $related instanceof Table ? $related : null;
+        }
+
+        return $this->table()->with('fields')->first();
+    }
+
+    public function comments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(RowComment::class);
+    }
+
+    private function countValue(Field $field): int
+    {
+        $link = $this->linkField($field);
+        if (! $link) {
+            return 0;
+        }
+        $raw = $this->rawValue($link);
+
+        return is_array($raw) ? count($raw) : 0;
+    }
+
+    private function linkField(Field $field): ?Field
+    {
+        $id = (int) ($field->options['link_field_id'] ?? 0);
+
+        return $this->parentTable()?->fields->firstWhere('id', $id);
+    }
+
+    private function lookupValue(Field $field): string
+    {
+        $link = $this->linkField($field);
+        if (! $link) {
+            return '';
+        }
+        $ids = array_map('intval', (array) $this->rawValue($link));
+        if ($ids === []) {
+            return '';
+        }
+        $targetTableId = (int) ($link->options['linked_table_id'] ?? 0);
+        $targetFieldId = (int) ($field->options['lookup_field_id'] ?? 0);
+        $related = \App\Models\Row::query()->where('table_id', $targetTableId)->whereIn('id', $ids)->get();
+        $target = \App\Models\Field::query()->find($targetFieldId);
+        if (! $target) {
+            return implode(', ', $ids);
+        }
+
+        return $related->map(fn (Row $row) => \App\Support\RowQuery::display($row, $target))->filter()->implode(', ');
     }
 
     public function setValue(Field $field, mixed $value): void

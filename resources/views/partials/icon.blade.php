@@ -53,6 +53,13 @@
         'info' => '<circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/>',
         'link' => '<path d="M10 14a4 4 0 0 1 0-5.6l2.1-2.1a4 4 0 0 1 5.6 5.6L16 13.6M14 10a4 4 0 0 1 0 5.6l-2.1 2.1a4 4 0 1 1-5.6-5.6L8 10.4"/>',
         'drag' => '<circle cx="9" cy="7" r="1.1"/><circle cx="15" cy="7" r="1.1"/><circle cx="9" cy="12" r="1.1"/><circle cx="15" cy="12" r="1.1"/><circle cx="9" cy="17" r="1.1"/><circle cx="15" cy="17" r="1.1"/>',
+        'file' => '<path d="M7 3.5h7l5 5V20H7zM14 3.5V9h5"/>',
+        'formula' => '<path d="M6 5h12M8 5v14M6 19h5M14 12h4M16 10v4"/>',
+        'ai' => '<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>',
+        'timeline' => '<path d="M4 12h16M7 8v8M17 8v8M12 6v12"/>',
+        'survey' => '<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+        'graph' => '<path d="M5 19V9M11 19V5M17 19v-7M3 19h18"/>',
+        'comment' => '<path d="M5 5h14v10H9l-4 4z"/>',
     ];
     $path = $icons[$name] ?? $icons['plus'];
 @endphp
