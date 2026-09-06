@@ -219,6 +219,12 @@ img { max-width: 100%; }
   font-size: 10px; font-weight: 700; color: var(--neutral-700);
   display: inline-flex; align-items: center; justify-content: center;
 }
+.tree-db-wrap { display: flex; align-items: flex-start; position: relative; }
+.tree-db-wrap .tree-db { flex: 1; min-width: 0; }
+.tree-db-wrap .tree-db__more { margin-top: 5px; }
+.tree-db-wrap:hover .tree-db__more { opacity: 1; }
+.sidebar-toggle { display: none; }
+.sidebar-backdrop { display: none; }
 .tree-db { margin-bottom: 2px; }
 .tree-db summary {
   list-style: none; display: flex; align-items: center; gap: 6px;
@@ -507,10 +513,22 @@ img { max-width: 100%; }
   .auth { grid-template-columns: 1fr; }
   .auth__aside { display: none; }
   .auth__panel { padding: 32px 20px; }
-  .sidebar { position: fixed; z-index: 12; height: 100%; transform: translateX(0); }
-  .app.sidebar-closed .sidebar { transform: translateX(-100%); }
+  .sidebar {
+    position: fixed; z-index: 12; height: 100%;
+    transform: translateX(-100%);
+    transition: transform 0.18s ease;
+  }
+  .app.sidebar-open .sidebar { transform: translateX(0); box-shadow: var(--shadow-high); }
+  .sidebar-toggle { display: inline-flex; }
+  .sidebar-backdrop {
+    display: none; position: fixed; inset: 0; z-index: 11;
+    background: rgba(7, 8, 16, 0.35);
+  }
+  .app.sidebar-open .sidebar-backdrop { display: block; }
   .form-builder { grid-template-columns: 1fr; }
   .form-settings { display: none; }
   .home__head { flex-direction: column; }
   .topbar__name { display: none; }
+  .grid__scroll { overflow: auto; -webkit-overflow-scrolling: touch; }
+  .view-stage { overflow: auto; }
 }

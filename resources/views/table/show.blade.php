@@ -37,19 +37,12 @@
             </div>
 
             @foreach ($workspace->databases as $db)
-                <details class="tree-db" {{ $db->id === $database->id ? 'open' : '' }} data-search-text="{{ strtolower($db->name) }}">
+                <div class="tree-db-wrap" data-search-text="{{ strtolower($db->name) }}">
+                <details class="tree-db" {{ $db->id === $database->id ? 'open' : '' }}>
                     <summary>
                         <span class="tree-db__icon">@include('partials.icon', ['name' => 'database', 'size' => 14])</span>
                         <span class="tree-db__name">{{ $db->name }}</span>
-                        <button type="button" class="icon-btn icon-btn--tiny" data-menu="db-menu-{{ $db->id }}" onclick="event.preventDefault()">
-                            @include('partials.icon', ['name' => 'more', 'size' => 14])
-                        </button>
                     </summary>
-                    <div class="menu" id="db-menu-{{ $db->id }}" hidden>
-                        <button type="button" data-rename="database" data-id="{{ $db->id }}" data-name="{{ $db->name }}">Rename</button>
-                        <button type="button" data-create-table="{{ $db->id }}">Create table</button>
-                        <button type="button" class="is-danger" data-delete="database" data-id="{{ $db->id }}">Delete</button>
-                    </div>
                     <ul class="tree-tables">
                         @foreach ($db->tables as $tbl)
                             <li data-search-text="{{ strtolower($tbl->name.' '.$db->name) }}">
@@ -70,6 +63,15 @@
                         @endforeach
                     </ul>
                 </details>
+                <button type="button" class="icon-btn icon-btn--tiny tree-db__more" data-menu="db-menu-{{ $db->id }}">
+                    @include('partials.icon', ['name' => 'more', 'size' => 14])
+                </button>
+                <div class="menu" id="db-menu-{{ $db->id }}" hidden>
+                    <button type="button" data-rename="database" data-id="{{ $db->id }}" data-name="{{ $db->name }}">Rename</button>
+                    <button type="button" data-create-table="{{ $db->id }}">Create table</button>
+                    <button type="button" class="is-danger" data-delete="database" data-id="{{ $db->id }}">Delete</button>
+                </div>
+                </div>
             @endforeach
         </div>
 
@@ -88,8 +90,12 @@
         </div>
     </aside>
 
+    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
     <section class="workspace">
         <div class="views-bar">
+            <button type="button" class="icon-btn sidebar-toggle" id="sidebar-toggle" aria-label="Open sidebar">
+                @include('partials.icon', ['name' => 'table', 'size' => 16])
+            </button>
             <div class="views-bar__tabs">
                 @foreach ($table->views as $v)
                     <a href="{{ route('tables.show', ['table' => $table, 'view' => $v->id]) }}"

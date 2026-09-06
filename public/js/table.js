@@ -423,9 +423,6 @@
       updateRow(rowId, { [field.id]: !row.values[field.id] });
       return;
     }
-    if (field.primary) {
-      openDrawer(rowId);
-    }
     const value = row.values[field.id];
     cell.classList.add("is-editing");
     let input;

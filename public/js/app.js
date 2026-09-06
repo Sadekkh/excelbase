@@ -90,6 +90,17 @@
     }
   });
 
+  const sidebarToggle = document.getElementById("sidebar-toggle");
+  const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+  const appShell = document.getElementById("app");
+  function setSidebar(open) {
+    if (!appShell) return;
+    appShell.classList.toggle("sidebar-open", open);
+    if (sidebarBackdrop) sidebarBackdrop.hidden = !open;
+  }
+  sidebarToggle?.addEventListener("click", () => setSidebar(!appShell.classList.contains("sidebar-open")));
+  sidebarBackdrop?.addEventListener("click", () => setSidebar(false));
+
   const sidebarSearch = document.getElementById("sidebar-search");
   if (sidebarSearch) {
     sidebarSearch.addEventListener("input", () => {
