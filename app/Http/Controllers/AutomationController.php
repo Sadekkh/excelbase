@@ -34,7 +34,9 @@ class AutomationController extends Controller
         $this->assertCanBuild($workspace);
         $plan = $workspace->resolvedPlan();
         if ($workspace->automations()->count() >= (int) $plan->feature('automations', 0)) {
-            return back()->withErrors(['name' => 'This plan allows '.$plan->feature('automations').' automations.']);
+            return $request->expectsJson()
+                ? response()->json(['message' => 'This plan allows '.$plan->feature('automations').' automations.'], 422)
+                : back()->withErrors(['name' => 'This plan allows '.$plan->feature('automations').' automations.']);
         }
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
@@ -72,7 +74,9 @@ class AutomationController extends Controller
             ],
         ]);
 
-        return back()->with('status', 'Automation “'.$data['name'].'” is on.');
+        return $request->expectsJson()
+            ? response()->json(['ok' => true, 'status' => 'Automation “'.$data['name'].'” is on.'])
+            : back()->with('status', 'Automation “'.$data['name'].'” is on.');
     }
 
     public function update(Request $request, Workspace $workspace, Automation $automation)
@@ -85,7 +89,9 @@ class AutomationController extends Controller
         ]);
         $automation->update($data);
 
-        return back()->with('status', $automation->name.' updated.');
+        return $request->expectsJson()
+            ? response()->json(['ok' => true, 'status' => $automation->name.' updated.'])
+            : back()->with('status', $automation->name.' updated.');
     }
 
     public function destroy(Workspace $workspace, Automation $automation)
@@ -95,6 +101,8 @@ class AutomationController extends Controller
         abort_unless($automation->workspace_id === $workspace->id, 404);
         $automation->delete();
 
-        return back()->with('status', 'Automation deleted.');
+        return request()->expectsJson()
+            ? response()->json(['ok' => true, 'status' => 'Automation deleted.'])
+            : back()->with('status', 'Automation deleted.');
     }
 }

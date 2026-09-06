@@ -1,11 +1,13 @@
 # Baserow
 
-A Laravel + Blade SaaS recreation of [Baserow](https://baserow.io). No Vue, React, Alpine, or Livewire. Each **client is a workspace** on a **plan**, with **roles**, a **platform admin**, **dashboards**, and **automations**. Builders create the structure; members only use it.
+A Laravel + Blade SaaS recreation of [Baserow](https://baserow.io). No Vue, React, Alpine, or Livewire. Each **client is a workspace** on a **plan**, with **roles**, a **platform admin**, **dashboards**, and **automations**.
+
+The workspace stays on one URL. A sidebar switches **Use** and **Build**. Use is a spreadsheet: search, filter, and edit cells. Build is for structure, automations, people, and plan.
 
 ## Surfaces
 
-- **Builder** — databases, tables, fields, views, automations, dashboards, people, and plan
-- **User (app)** — published dashboards and tables only; no structure editing
+- **Use** — Excel-like sheets, search, filters, and dashboards. Members and viewers only see this.
+- **Build** — databases, tables, fields, automations, people, and plan. Owners, admins, and builders.
 - **Platform admin** (`/admin`) — all workspaces, users, and plan limits
 
 ## Roles

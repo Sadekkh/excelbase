@@ -42,7 +42,9 @@ class MemberController extends Controller
 
         $limit = (int) $plan->feature('members', 3);
         if ($workspace->members()->count() >= $limit) {
-            return back()->withErrors(['email' => 'This plan allows '.$limit.' members. Upgrade to add more.']);
+            return $request->expectsJson()
+                ? response()->json(['message' => 'This plan allows '.$limit.' members. Upgrade to add more.'], 422)
+                : back()->withErrors(['email' => 'This plan allows '.$limit.' members. Upgrade to add more.']);
         }
 
         $member = User::query()->where('email', $data['email'])->first();
@@ -56,13 +58,19 @@ class MemberController extends Controller
             $created = true;
         }
         if ($workspace->members()->where('users.id', $member->id)->exists()) {
-            return back()->withErrors(['email' => 'That person is already in the workspace.']);
+            return $request->expectsJson()
+                ? response()->json(['message' => 'That person is already in the workspace.'], 422)
+                : back()->withErrors(['email' => 'That person is already in the workspace.']);
         }
         $workspace->members()->attach($member->id, ['role' => $data['role']]);
 
-        return back()->with('status', $created
+        $status = $created
             ? $member->name.' was invited. They can sign in with this email and password “password”.'
-            : $member->name.' was added as '.Access::label($data['role']).'.');
+            : $member->name.' was added as '.Access::label($data['role']).'.';
+
+        return $request->expectsJson()
+            ? response()->json(['ok' => true, 'status' => $status])
+            : back()->with('status', $status);
     }
 
     public function update(Request $request, Workspace $workspace, User $user)
@@ -77,12 +85,16 @@ class MemberController extends Controller
         if ($data['role'] !== 'owner' && $workspace->members()->wherePivot('role', 'owner')->count() <= 1) {
             $current = Access::role($user, $workspace);
             if ($current === 'owner') {
-                return back()->withErrors(['role' => 'Keep at least one owner.']);
+                return $request->expectsJson()
+                    ? response()->json(['message' => 'Keep at least one owner.'], 422)
+                    : back()->withErrors(['role' => 'Keep at least one owner.']);
             }
         }
         $workspace->members()->updateExistingPivot($user->id, ['role' => $data['role']]);
 
-        return back()->with('status', $user->name.' is now '.Access::label($data['role']).'.');
+        return $request->expectsJson()
+            ? response()->json(['ok' => true, 'status' => $user->name.' is now '.Access::label($data['role']).'.'])
+            : back()->with('status', $user->name.' is now '.Access::label($data['role']).'.');
     }
 
     public function destroy(Workspace $workspace, User $user)
@@ -93,6 +105,8 @@ class MemberController extends Controller
         abort_if(Access::role($user, $workspace) === 'owner', 422, 'Transfer ownership before removing an owner.');
         $workspace->members()->detach($user->id);
 
-        return back()->with('status', $user->name.' was removed.');
+        return request()->expectsJson()
+            ? response()->json(['ok' => true, 'status' => $user->name.' was removed.'])
+            : back()->with('status', $user->name.' was removed.');
     }
 }

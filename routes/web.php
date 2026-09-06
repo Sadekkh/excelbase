@@ -19,6 +19,7 @@ use App\Http\Controllers\SurfaceController;
 use App\Http\Controllers\TableController;
 use App\Http\Controllers\ViewController;
 use App\Http\Controllers\WorkspaceController;
+use App\Http\Controllers\WorkspacePanelController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/form/{slug}', [PublicFormController::class, 'show'])->name('forms.public');
@@ -45,6 +46,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/workspace/{workspace}', [WorkspaceController::class, 'show'])->name('workspaces.show');
     Route::patch('/workspace/{workspace}', [WorkspaceController::class, 'update'])->name('workspaces.update');
     Route::delete('/workspace/{workspace}', [WorkspaceController::class, 'destroy'])->name('workspaces.destroy');
+    Route::get('/workspace/{workspace}/boot', [WorkspacePanelController::class, 'boot'])->name('workspaces.panel.boot');
+    Route::get('/workspace/{workspace}/panel/sheet/{table}', [WorkspacePanelController::class, 'sheet'])->name('workspaces.panel.sheet');
+    Route::get('/workspace/{workspace}/panel/board/{dashboard?}', [WorkspacePanelController::class, 'board'])->name('workspaces.panel.board');
+    Route::get('/workspace/{workspace}/panel/people', [WorkspacePanelController::class, 'people'])->name('workspaces.panel.people');
+    Route::get('/workspace/{workspace}/panel/automations', [WorkspacePanelController::class, 'automations'])->name('workspaces.panel.automations');
+    Route::get('/workspace/{workspace}/panel/plan', [WorkspacePanelController::class, 'plan'])->name('workspaces.panel.plan');
+    Route::get('/workspace/{workspace}/panel/structure', [WorkspacePanelController::class, 'structure'])->name('workspaces.panel.structure');
+    Route::post('/workspace/{workspace}/surface', [WorkspacePanelController::class, 'switchSurface'])->name('workspaces.surface');
     Route::get('/workspace/{workspace}/app', [SurfaceController::class, 'app'])->name('workspaces.app');
     Route::get('/workspace/{workspace}/plan', [SurfaceController::class, 'billing'])->name('workspaces.billing');
     Route::post('/workspace/{workspace}/plan', [SurfaceController::class, 'choosePlan'])->name('workspaces.plan');

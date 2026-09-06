@@ -55,7 +55,7 @@ class Access
             return 'app';
         }
 
-        return session('surface', 'builder');
+        return session('surface', 'app');
     }
 
     public static function label(?string $role): string

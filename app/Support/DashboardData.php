@@ -84,7 +84,8 @@ class DashboardData
             return [
                 'id' => $row->id,
                 'label' => $primary ? (RowQuery::display($row, $primary) ?: 'Untitled') : 'Row '.$row->id,
-                'href' => '/table/'.$table->id,
+                'href' => '#',
+                'table_id' => $table->id,
             ];
         })->all();
 

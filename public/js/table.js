@@ -1,16 +1,25 @@
-(() => {
-  const bootEl = document.getElementById("table-bootstrap");
-  if (!bootEl) return;
-  const state = JSON.parse(bootEl.textContent);
+window.BaserowTable = (() => {
+  let state = null;
   const api = window.Baserow.api;
   const toast = window.Baserow.toast;
-  const stage = document.getElementById("view-stage");
-  const drawer = document.getElementById("row-drawer");
+  let stage = document.getElementById("view-stage");
+  let drawer = document.getElementById("row-drawer");
   let selected = new Set();
   let calendarCursor = new Date();
   let active = null;
-  const readOnly = !!state.readOnly;
-  const canBuild = !!state.canBuild;
+  let readOnly = false;
+  let canBuild = false;
+
+  function applyState(next) {
+    state = next;
+    stage = document.getElementById("view-stage");
+    drawer = document.getElementById("row-drawer");
+    selected = new Set();
+    calendarCursor = new Date();
+    active = null;
+    readOnly = !!state.readOnly;
+    canBuild = !!state.canBuild;
+  }
 
   const ICONS = {
     text: "M6 6h12M12 6v13",
@@ -189,6 +198,7 @@
   }
 
   function render() {
+    if (!state || !stage) return;
     selected = new Set([...selected].filter((id) => state.rows.some((r) => r.id === id)));
     if (state.view.type === "gallery") return renderGallery();
     if (state.view.type === "kanban") return renderKanban();
@@ -554,10 +564,21 @@
   }
 
   function reload() {
-    const url = new URL(state.urls.table, location.origin);
+    const q = document.getElementById("grid-search")?.value || "";
+    if (window.BaserowShell?.reloadSheet) {
+      window.BaserowShell.reloadSheet({ viewId: state.view.id, search: q });
+      return;
+    }
+    const url = new URL(state.urls.sheet || state.urls.table, location.origin);
     url.searchParams.set("view", state.view.id);
-    const q = document.getElementById("grid-search")?.value;
     if (q) url.searchParams.set("search", q);
+    if (state.urls.sheet) {
+      api(url.toString()).then((data) => {
+        applyState(data.bootstrap);
+        render();
+      }).catch((err) => toast(err.message || "Could not reload sheet"));
+      return;
+    }
     location.href = url.toString();
   }
 
@@ -903,7 +924,7 @@
         }
         root.innerHTML = "";
         if (["formula", "ai", "lookup", "count"].includes(type)) {
-          location.reload();
+          reload();
           return;
         }
         render();
@@ -991,6 +1012,7 @@
   }
 
   document.addEventListener("click", async (e) => {
+    if (!state) return;
     const t = e.target.closest("[data-add-field]");
     if (t) { if (canBuild) fieldModal(); return; }
     const fh = e.target.closest("[data-field-menu]");
@@ -1022,20 +1044,26 @@
       return;
     }
     const createView = e.target.closest("[data-create-view]");
-    if (createView && canBuild) {
-      const form = document.createElement("form");
-      form.method = "post";
-      form.action = state.urls.views;
-      const personal = document.getElementById("create-personal")?.checked ? `<input name="is_personal" value="1">` : "";
-      form.innerHTML = `<input name="_token" value="${state.csrf}"><input name="type" value="${createView.dataset.createView}">${personal}`;
-      document.body.appendChild(form);
-      form.submit();
+    if (createView && canBuild && !window.BaserowShell) {
+      try {
+        const created = await api(state.urls.views, {
+          method: "POST",
+          body: JSON.stringify({
+            type: createView.dataset.createView,
+            is_personal: !!document.getElementById("create-personal")?.checked,
+          }),
+        });
+        state.view.id = created.id;
+        reload();
+      } catch (err) {
+        toast(err.message || "Could not create view");
+      }
       return;
     }
     const togglePersonal = e.target.closest("[data-toggle-personal]");
     if (togglePersonal) {
       await saveView({ is_personal: !state.view.is_personal });
-      location.reload();
+      reload();
       return;
     }
     const filterAdd = e.target.closest("[data-filter-add]");
@@ -1165,7 +1193,8 @@
         : kind === "table" ? `${state.routes.table}/${rename.dataset.id}`
         : `${state.routes.view}/${rename.dataset.id}`;
       await api(url, { method: "PATCH", body: JSON.stringify({ name }) });
-      location.reload();
+      if (window.BaserowShell?.refreshBoot) await window.BaserowShell.refreshBoot();
+      reload();
       return;
     }
     const del = e.target.closest("[data-delete]");
@@ -1175,24 +1204,37 @@
       const url = kind === "database" ? `${state.routes.database}/${del.dataset.id}`
         : kind === "table" ? `${state.routes.table}/${del.dataset.id}`
         : `${state.routes.view}/${del.dataset.id}`;
-      const res = await api(url, { method: "DELETE" });
-      location.href = res.redirect || state.urls.table;
+      await api(url, { method: "DELETE" });
+      if (window.BaserowShell?.refreshBoot) await window.BaserowShell.refreshBoot();
+      if (kind === "table" && window.BaserowShell?.refreshBoot) {
+        const next = (state.siblingTables || []).find((t) => t.id !== Number(del.dataset.id));
+        if (next && window.BaserowShell.openSheet) {
+          window.BaserowShell.openSheet(next.id);
+          return;
+        }
+      }
+      reload();
       return;
     }
     const createTable = e.target.closest("[data-create-table]");
     if (createTable) {
       const name = prompt("Table name", "Table");
       if (!name) return;
-      const form = document.createElement("form");
-      form.method = "post";
-      form.action = `/database/${createTable.dataset.createTable}/tables`;
-      form.innerHTML = `<input name="_token" value="${state.csrf}"><input name="name" value="${esc(name)}">`;
-      document.body.appendChild(form);
-      form.submit();
+      try {
+        const created = await api(`/database/${createTable.dataset.createTable}/tables`, {
+          method: "POST",
+          body: JSON.stringify({ name }),
+        });
+        if (window.BaserowShell?.refreshBoot) await window.BaserowShell.refreshBoot();
+        if (window.BaserowShell?.openSheet) window.BaserowShell.openSheet(created.id);
+      } catch (err) {
+        toast(err.message || "Could not create table");
+      }
     }
   });
 
   document.addEventListener("change", async (e) => {
+    if (!state) return;
     const sel = e.target.closest("[data-select-row]");
     if (sel) {
       const id = Number(sel.dataset.selectRow);
@@ -1248,6 +1290,7 @@
   });
 
   document.addEventListener("keydown", async (e) => {
+    if (!state) return;
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !readOnly) {
       const add = document.querySelector("[data-add-row]");
       if (add && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) addRow();
@@ -1302,7 +1345,7 @@
       fd.append("file", importInput.files[0]);
       fd.append("_token", state.csrf);
       await fetch(state.urls.import, { method: "POST", body: fd, headers: { Accept: "application/json", "X-CSRF-TOKEN": state.csrf } });
-      location.reload();
+      reload();
     });
   }
 
@@ -1313,10 +1356,30 @@
     }
   });
   document.addEventListener("keydown", (e) => {
+    if (!state) return;
     if (e.key === "Enter" && e.target.matches("[data-filter][data-key='value']")) {
       persistFiltersSorts();
     }
   });
 
-  render();
+  function mount(next) {
+    applyState(next);
+    render();
+  }
+
+  function unmount() {
+    state = null;
+    if (stage) stage.innerHTML = "";
+    if (drawer) {
+      drawer.hidden = true;
+      drawer.innerHTML = "";
+    }
+  }
+
+  const bootEl = document.getElementById("table-bootstrap");
+  if (bootEl) {
+    mount(JSON.parse(bootEl.textContent));
+  }
+
+  return { mount, unmount };
 })();

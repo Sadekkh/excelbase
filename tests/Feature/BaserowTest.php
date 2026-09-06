@@ -183,11 +183,23 @@ class BaserowTest extends TestCase
         $this->actingAs($member)->get(route('admin.index'))->assertForbidden();
 
         $this->actingAs($member)->get(route('workspaces.show', $workspace))
-            ->assertRedirect(route('workspaces.app', $workspace));
-        $this->actingAs($member)->get(route('workspaces.app', $workspace))
             ->assertOk()
-            ->assertSee('CRM overview')
-            ->assertSee('Using Acme Inc');
+            ->assertSee('Use')
+            ->assertSee('Acme Inc')
+            ->assertSee('CRM overview');
+
+        $this->actingAs($member)->getJson(route('workspaces.panel.sheet', [$workspace, $table]))
+            ->assertOk()
+            ->assertJsonPath('kind', 'sheet')
+            ->assertJsonPath('bootstrap.table.name', 'Deals');
+
+        $this->actingAs($owner)->postJson(route('workspaces.surface', $workspace), ['surface' => 'builder'])
+            ->assertOk()
+            ->assertJsonPath('surface', 'builder')
+            ->assertJsonPath('can_build', true);
+
+        $this->actingAs($member)->getJson(route('workspaces.panel.automations', $workspace))
+            ->assertForbidden();
 
         $this->actingAs($member)->postJson(route('fields.store', $table), [
             'name' => 'Secret',

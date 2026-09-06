@@ -30,7 +30,13 @@
             @if (!empty($data['rows']))
                 <ul class="widget__list">
                     @foreach ($data['rows'] as $row)
-                        <li><a href="{{ $row['href'] }}">{{ $row['label'] }}</a></li>
+                        <li>
+                            @if (!empty($row['table_id']))
+                                <a href="{{ route('workspaces.show', $workspace) }}">{{ $row['label'] }}</a>
+                            @else
+                                <a href="{{ $row['href'] ?? '#' }}">{{ $row['label'] }}</a>
+                            @endif
+                        </li>
                     @endforeach
                 </ul>
             @endif

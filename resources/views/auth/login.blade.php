@@ -40,7 +40,7 @@
         <p class="auth__hint">
             <strong>demo@baserow.io</strong> owner + platform admin ·
             <strong>sam@baserow.io</strong> builder ·
-            <strong>maya@baserow.io</strong> member (user surface). Password for all: <strong>password</strong>
+            <strong>maya@baserow.io</strong> member (Use mode only). Password for all: <strong>password</strong>
         </p>
     </div>
     <aside class="auth__aside">

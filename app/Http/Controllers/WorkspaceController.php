@@ -29,18 +29,18 @@ class WorkspaceController extends Controller
     public function show(Workspace $workspace)
     {
         $workspace = $this->workspaceForUser($workspace->id);
-        $workspace->load(['databases.tables', 'members', 'plan', 'dashboards']);
-        if (Access::surface(auth()->user(), $workspace) === 'app') {
-            return redirect()->route('workspaces.app', $workspace);
-        }
+        $workspace->load(['databases.tables', 'members', 'plan', 'dashboards.widgets', 'automations']);
+        $user = auth()->user();
 
-        return view('workspace.show', [
+        return view('workspace.shell', [
             'workspace' => $workspace,
-            'workspaces' => auth()->user()->workspaces,
-            'user' => auth()->user(),
-            'role' => Access::role(auth()->user(), $workspace),
+            'workspaces' => $user->workspaces,
+            'user' => $user,
+            'role' => Access::role($user, $workspace),
             'plan' => $workspace->resolvedPlan(),
-            'canBuild' => Access::canBuild(auth()->user(), $workspace),
+            'canBuild' => Access::canBuild($user, $workspace),
+            'surface' => Access::surface($user, $workspace),
+            'boot' => \App\Support\WorkspaceShell::boot($user, $workspace),
         ]);
     }
 
