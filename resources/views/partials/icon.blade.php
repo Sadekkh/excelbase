@@ -51,6 +51,7 @@
         'color' => '<path d="M12 4.5 6 14.5A6 6 0 0 0 12 20a6 6 0 0 0 6-5.5L12 4.5z"/>',
         'group' => '<path d="M4 8h16M4 13h10M4 18h7"/>',
         'info' => '<circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/>',
+        'link' => '<path d="M10 14a4 4 0 0 1 0-5.6l2.1-2.1a4 4 0 0 1 5.6 5.6L16 13.6M14 10a4 4 0 0 1 0 5.6l-2.1 2.1a4 4 0 1 1-5.6-5.6L8 10.4"/>',
         'drag' => '<circle cx="9" cy="7" r="1.1"/><circle cx="15" cy="7" r="1.1"/><circle cx="9" cy="12" r="1.1"/><circle cx="15" cy="12" r="1.1"/><circle cx="9" cy="17" r="1.1"/><circle cx="15" cy="17" r="1.1"/>',
     ];
     $path = $icons[$name] ?? $icons['plus'];

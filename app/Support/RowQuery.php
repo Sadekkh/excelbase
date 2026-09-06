@@ -102,6 +102,9 @@ class RowQuery
             return optional($row->updated_at)->toDateTimeString() ?? '';
         }
         if (is_array($value)) {
+            if ($field->type === 'file') {
+                return collect($value)->pluck('name')->filter()->implode(', ');
+            }
             if ($field->isSelect()) {
                 $labels = [];
                 foreach ((array) $value as $id) {

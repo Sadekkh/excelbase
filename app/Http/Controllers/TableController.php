@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesWorkspace;
+use App\Http\Controllers\PublicShareController;
 use App\Models\Database;
 use App\Models\Table;
 use App\Support\FieldTypes;
@@ -71,7 +72,9 @@ class TableController extends Controller
                 'table' => route('tables.show', $table),
                 'import' => route('tables.import', $table),
                 'export' => route('tables.export', $table),
-                'formPublic' => $view->public_slug ? route('forms.public', $view->public_slug) : null,
+                'formPublic' => $view->public_slug && $view->type === 'form' ? route('forms.public', $view->public_slug) : null,
+                'shared' => $view->public_slug ? route('views.shared', $view->public_slug) : null,
+                'upload' => route('files.store'),
             ],
             'table' => [
                 'id' => $table->id,
@@ -109,6 +112,12 @@ class TableController extends Controller
             'rows' => $rows->map(fn ($r) => $r->toApi($table->fields))->values(),
             'fieldTypes' => FieldTypes::all(),
             'selectColors' => SelectColors::all(),
+            'siblingTables' => $table->database->tables->map(fn ($t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+            ])->values(),
+            'linkedRows' => PublicShareController::linkedRows($table->database->loadMissing(['tables.fields', 'tables.rows'])),
+            'readOnly' => false,
             'routes' => [
                 'field' => url('/fields'),
                 'row' => url('/rows'),

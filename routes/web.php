@@ -5,7 +5,9 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\FieldController;
+use App\Http\Controllers\FileController;
 use App\Http\Controllers\PublicFormController;
+use App\Http\Controllers\PublicShareController;
 use App\Http\Controllers\RowController;
 use App\Http\Controllers\TableController;
 use App\Http\Controllers\ViewController;
@@ -14,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/form/{slug}', [PublicFormController::class, 'show'])->name('forms.public');
 Route::post('/form/{slug}', [PublicFormController::class, 'store'])->name('forms.public.submit');
+Route::get('/shared/{slug}', [PublicShareController::class, 'show'])->name('views.shared');
 
 Route::middleware('guest')->group(function () {
     Route::get('/', [LoginController::class, 'create'])->name('login');
@@ -50,6 +53,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/fields/{field}', [FieldController::class, 'update'])->name('fields.update');
     Route::delete('/fields/{field}', [FieldController::class, 'destroy'])->name('fields.destroy');
     Route::post('/fields/{field}/options', [FieldController::class, 'storeOption'])->name('fields.options.store');
+    Route::post('/files', [FileController::class, 'store'])->name('files.store');
 
     Route::get('/table/{table}/rows', [RowController::class, 'index'])->name('rows.index');
     Route::post('/table/{table}/rows', [RowController::class, 'store'])->name('rows.store');

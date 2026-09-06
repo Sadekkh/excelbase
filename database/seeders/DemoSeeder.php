@@ -42,7 +42,7 @@ class DemoSeeder extends Seeder
             'order' => 2,
         ]);
 
-        $clients = $this->clientsTable($crm);
+        $clients = $this->clientsTable($crm)->load(['fields', 'rows']);
         $this->dealsTable($crm, $clients);
         $this->tasksTable($crm);
         $this->featuresTable($product);
@@ -140,9 +140,15 @@ class DemoSeeder extends Seeder
             ['value' => 'High', 'color' => 'red'],
         ]);
 
+        $clientName = $clients->fields()->where('primary', true)->first();
+        $clientIds = [];
+        foreach ($clients->rows as $clientRow) {
+            $clientIds[(string) $clientRow->value($clientName)] = $clientRow->id;
+        }
+
         $fields = $this->createFields($table, [
             ['Name', 'text', true, 240],
-            ['Client', 'text', false, 180],
+            ['Client', 'link_row', false, 200, ['linked_table_id' => $clients->id]],
             ['Stage', 'single_select', false, 150, ['options' => $stage]],
             ['Amount', 'number', false, 130, ['decimal_places' => 0, 'prefix' => '$', 'suffix' => '']],
             ['Priority', 'single_select', false, 130, ['options' => $priority]],
@@ -169,7 +175,7 @@ class DemoSeeder extends Seeder
                 'order' => $i + 1,
                 'data' => [
                     (string) $fields['Name']->id => $r[0],
-                    (string) $fields['Client']->id => $r[1],
+                    (string) $fields['Client']->id => isset($clientIds[$r[1]]) ? [$clientIds[$r[1]]] : [],
                     (string) $fields['Stage']->id => $stageIds[$r[2]],
                     (string) $fields['Amount']->id => $r[3],
                     (string) $fields['Priority']->id => $prioIds[$r[4]],

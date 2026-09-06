@@ -7,11 +7,11 @@ A Laravel + Blade recreation of [Baserow](https://baserow.io) — the open-sourc
 - **Accounts** — sign in, sign up, demo workspace
 - **Workspaces** — create, rename, delete; switch from the sidebar
 - **Databases & tables** — create, rename, delete, duplicate tables
-- **Fields** — text, long text, number, rating, boolean, date, single/multiple select, URL, email, phone, created on, last modified
-- **Rows** — inline grid edit, expand drawer, bulk select, duplicate, delete
+- **Fields** — text, long text, number, rating, boolean, date, single/multiple select, URL, email, phone, link to table, file, created on, last modified
+- **Rows** — inline grid edit, expand drawer, bulk select, duplicate, delete, arrow-key navigation, copy/paste
 - **Views** — grid, gallery, kanban, calendar, form
-- **Grid tools** — filter, sort, group, hide fields, row height, column resize, field summaries, CSV import/export
-- **Public forms** — share a form URL that writes into the table
+- **Grid tools** — filter, sort, group, hide fields, row height, column resize, field summaries, row coloring, CSV import/export
+- **Sharing** — public grid/gallery/kanban links and public forms that write into the table
 
 The demo workspace (`Acme Inc`) ships with a CRM (Clients, Deals, Tasks) and a Product database so the app looks like a real Baserow instance.
 
@@ -25,6 +25,7 @@ cp .env.example .env
 php artisan key:generate
 touch database/database.sqlite
 php artisan migrate:fresh --seed
+php artisan storage:link
 php artisan serve --host=127.0.0.1 --port=43127
 ```
 

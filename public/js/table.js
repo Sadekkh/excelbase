@@ -8,6 +8,8 @@
   const drawer = document.getElementById("row-drawer");
   let selected = new Set();
   let calendarCursor = new Date();
+  let active = null;
+  const readOnly = !!state.readOnly;
 
   const ICONS = {
     text: "M6 6h12M12 6v13",
@@ -31,6 +33,8 @@
     drag: "M9 7h.01M15 7h.01M9 12h.01M15 12h.01M9 17h.01M15 17h.01",
     "chevron-left": "M14.5 7 9.5 12 14.5 17",
     "chevron-right": "M9.5 7 14.5 12 9.5 17",
+    link: "M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6L16 13M14 10a4 4 0 0 1 0 5.6l-2 2a4 4 0 1 1-5.6-5.6L8 10",
+    file: "M7 3.5h7l5 5V20H7zM14 3.5V9h5",
   };
 
   function icon(name, size = 14) {
@@ -68,6 +72,12 @@
     if (field.type === "multiple_select") {
       return (value || []).map((id) => optionLabel(field, id)?.value).filter(Boolean).join(", ");
     }
+    if (field.type === "link_row") {
+      return linkedLabels(field, value).join(", ");
+    }
+    if (field.type === "file") {
+      return (value || []).map((f) => f.name).filter(Boolean).join(", ");
+    }
     return value == null ? "" : String(value);
   }
 
@@ -77,12 +87,22 @@
     return `<span class="pill" style="background:${c.bg};color:${c.text}">${esc(opt.value)}</span>`;
   }
 
-  function stars(n, max = 5) {
-    const v = Number(n) || 0;
-    return `<span class="stars">${"★".repeat(v)}<span style="color:#d7d8d9">${"★".repeat(Math.max(0, max - v))}</span></span>`;
+  function linkedLabels(field, value) {
+    const tableId = field.options?.linked_table_id;
+    const catalog = (state.linkedRows && state.linkedRows[tableId]) || [];
+    return (value || []).map((id) => catalog.find((r) => Number(r.id) === Number(id))?.label || `#${id}`);
   }
 
-  function cellHTML(field, value) {
+  function stars(n, max = 5, rowId, fieldId) {
+    const v = Number(n) || 0;
+    const bits = [];
+    for (let i = 1; i <= max; i++) {
+      bits.push(`<button type="button" class="star-btn ${i <= v ? "is-on" : ""}" data-rate="${rowId}:${fieldId}:${i}">★</button>`);
+    }
+    return `<span class="stars">${bits.join("")}</span>`;
+  }
+
+  function cellHTML(field, value, rowId) {
     if (field.type === "boolean") {
       return `<span class="bool ${value ? "is-on" : ""}">${value ? icon("check", 12) : ""}</span>`;
     }
@@ -90,7 +110,13 @@
     if (field.type === "multiple_select") {
       return (value || []).map((id) => pill(optionLabel(field, id))).join(" ");
     }
-    if (field.type === "rating") return stars(value, field.options?.max || 5);
+    if (field.type === "rating") return stars(value, field.options?.max || 5, rowId, field.id);
+    if (field.type === "link_row") {
+      return linkedLabels(field, value).map((label) => `<span class="pill" style="background:#dae4fd;color:#083663">${esc(label)}</span>`).join(" ");
+    }
+    if (field.type === "file") {
+      return (value || []).map((f) => `<a class="file-chip" href="${esc(f.url)}" target="_blank" rel="noreferrer">${esc(f.name || "File")}</a>`).join(" ");
+    }
     if (field.type === "url" && value) return `<a href="${esc(value)}" target="_blank" rel="noreferrer">${esc(value)}</a>`;
     if (field.type === "email" && value) return `<a href="mailto:${esc(value)}">${esc(value)}</a>`;
     return esc(value);
@@ -98,7 +124,7 @@
 
   function empty(field, value) {
     if (value == null || value === "") return true;
-    if (field.type === "multiple_select" && Array.isArray(value) && !value.length) return true;
+    if (["multiple_select", "link_row", "file"].includes(field.type) && Array.isArray(value) && !value.length) return true;
     if (field.type === "boolean") return !value;
     return false;
   }
@@ -144,6 +170,16 @@
     return out;
   }
 
+  function rowColorStyle(row) {
+    const fieldId = state.view.field_options?.row_color_field_id;
+    if (!fieldId) return "";
+    const field = fieldById(fieldId);
+    const opt = field && optionLabel(field, row.values[fieldId]);
+    if (!opt) return "";
+    const c = colorOf(opt.color);
+    return `style="box-shadow:inset 3px 0 0 ${c.text}"`;
+  }
+
   function render() {
     selected = new Set([...selected].filter((id) => state.rows.some((r) => r.id === id)));
     if (state.view.type === "gallery") return renderGallery();
@@ -165,14 +201,14 @@
               <tr>
                 <th class="grid__gutter"><div class="grid__gutter-inner"></div></th>
                 ${fields.map((f) => `
-                  <th style="width:${f.width}px;min-width:${f.width}px" data-field-id="${f.id}">
+                  <th class="${f.primary ? "grid__primary" : ""}" style="width:${f.width}px;min-width:${f.width}px" data-field-id="${f.id}">
                     <div class="field-head" data-field-menu="${f.id}">
                       <span class="field-head__icon">${icon(f.icon)}</span>
                       <span class="field-head__name">${esc(f.name)}</span>
                     </div>
                     <div class="col-resizer" data-resize="${f.id}"></div>
                   </th>`).join("")}
-                <th style="min-width:140px"><button class="add-field" data-add-field>${icon("plus")} Add field</button></th>
+                <th style="min-width:140px">${readOnly ? "" : `<button class="add-field" data-add-field>${icon("plus")} Add field</button>`}</th>
               </tr>
             </thead>
             <tbody>
@@ -180,25 +216,25 @@
                 <tr class="grid__row"><td class="grid__gutter"></td><td colspan="${fields.length + 1}">
                   <div class="cell" style="font-weight:600;background:var(--neutral-25)">${esc(entry.label)} · ${entry.count}</div>
                 </td></tr>` : `
-                <tr class="grid__row ${selected.has(entry.row.id) ? "is-selected" : ""}" data-row-id="${entry.row.id}">
+                <tr class="grid__row ${selected.has(entry.row.id) ? "is-selected" : ""}" data-row-id="${entry.row.id}" ${rowColorStyle(entry.row)}>
                   <td class="grid__gutter">
                     <div class="grid__gutter-inner">
                       <input type="checkbox" class="grid__check" data-select-row="${entry.row.id}" ${selected.has(entry.row.id) ? "checked" : ""}>
                       <span>${entry.index}</span>
-                      <button type="button" data-open-row="${entry.row.id}" title="Expand">${icon("expand", 13)}</button>
+                      ${readOnly ? "" : `<button type="button" data-open-row="${entry.row.id}" title="Expand">${icon("expand", 13)}</button>`}
                     </div>
                   </td>
                   ${fields.map((f) => `
-                    <td style="width:${f.width}px;min-width:${f.width}px">
-                      <div class="cell ${f.primary ? "is-primary" : ""} ${empty(f, entry.row.values[f.id]) ? "cell--empty" : ""}" data-edit="${entry.row.id}:${f.id}">
-                        ${cellHTML(f, entry.row.values[f.id])}
+                    <td class="${f.primary ? "grid__primary" : ""}" style="width:${f.width}px;min-width:${f.width}px">
+                      <div class="cell ${f.primary ? "is-primary" : ""} ${empty(f, entry.row.values[f.id]) ? "cell--empty" : ""} ${active && active.rowId === entry.row.id && Number(active.fieldId) === Number(f.id) ? "is-active" : ""}" data-edit="${entry.row.id}:${f.id}">
+                        ${cellHTML(f, entry.row.values[f.id], entry.row.id)}
                       </div>
                     </td>`).join("")}
                   <td></td>
                 </tr>`).join("")}
               <tr>
                 <td class="grid__gutter"></td>
-                <td colspan="${fields.length + 1}"><button class="add-row" data-add-row>${icon("plus")} New row</button></td>
+                <td colspan="${fields.length + 1}">${readOnly ? "" : `<button class="add-row" data-add-row>${icon("plus")} New row</button>`}</td>
               </tr>
             </tbody>
           </table>
@@ -223,9 +259,9 @@
         <article class="card" data-open-row="${row.id}">
           <h3>${esc(display(primary, row.values[primary?.id])) || "Untitled"}</h3>
           <dl>${fields.filter((f) => !f.primary).slice(0, 5).map((f) => `
-            <div><dt>${esc(f.name)}</dt><dd>${cellHTML(f, row.values[f.id]) || "—"}</dd></div>`).join("")}</dl>
+            <div><dt>${esc(f.name)}</dt><dd>${cellHTML(f, row.values[f.id], row.id) || "—"}</dd></div>`).join("")}</dl>
         </article>`).join("")}
-      <button class="card gallery__add" data-add-row>${icon("plus")} New row</button>
+      ${readOnly ? "" : `<button class="card gallery__add" data-add-row>${icon("plus")} New row</button>`}
     </div>`;
   }
 
@@ -418,11 +454,16 @@
   function startEdit(rowId, fieldId, cell) {
     const field = fieldById(fieldId);
     const row = state.rows.find((r) => r.id === rowId);
-    if (!field || !row || field.read_only) return;
+    active = { rowId, fieldId: Number(fieldId) };
+    if (readOnly || !field || !row || field.read_only) return;
     if (field.type === "boolean") {
       updateRow(rowId, { [field.id]: !row.values[field.id] });
       return;
     }
+    if (field.type === "rating") return;
+    if (field.type === "link_row") { openLinkPicker(rowId, field, cell); return; }
+    if (field.type === "file") { pickFile(rowId, field); return; }
+    if (field.type === "multiple_select") { openMultiPicker(rowId, field, cell); return; }
     const value = row.values[field.id];
     cell.classList.add("is-editing");
     let input;
@@ -465,6 +506,47 @@
       if (e.key === "Enter" && field.type !== "long_text") { e.preventDefault(); input.blur(); }
       if (e.key === "Escape") render();
     });
+  }
+
+  function openMultiPicker(rowId, field, cell) {
+    const current = new Set((state.rows.find((r) => r.id === rowId).values[field.id] || []).map(String));
+    cell.classList.add("is-editing");
+    cell.innerHTML = `<div class="cell-pop">${(field.options?.options || []).map((o) =>
+      `<label class="check"><input type="checkbox" value="${esc(o.id)}" ${current.has(String(o.id)) ? "checked" : ""}> ${esc(o.value)}</label>`
+    ).join("")}<button type="button" class="btn btn--primary" data-apply-multi>Done</button></div>`;
+    cell.querySelector("[data-apply-multi]").onclick = async () => {
+      const ids = [...cell.querySelectorAll("input:checked")].map((i) => i.value);
+      await updateRow(rowId, { [field.id]: ids });
+    };
+  }
+
+  function openLinkPicker(rowId, field, cell) {
+    const tableId = field.options?.linked_table_id;
+    const catalog = (state.linkedRows && state.linkedRows[tableId]) || [];
+    const current = new Set((state.rows.find((r) => r.id === rowId).values[field.id] || []).map(String));
+    cell.classList.add("is-editing");
+    cell.innerHTML = `<div class="cell-pop">${catalog.map((r) =>
+      `<label class="check"><input type="checkbox" value="${r.id}" ${current.has(String(r.id)) ? "checked" : ""}> ${esc(r.label)}</label>`
+    ).join("") || "<p>No rows in the linked table.</p>"}<button type="button" class="btn btn--primary" data-apply-link>Done</button></div>`;
+    cell.querySelector("[data-apply-link]").onclick = async () => {
+      const ids = [...cell.querySelectorAll("input:checked")].map((i) => Number(i.value));
+      await updateRow(rowId, { [field.id]: ids });
+    };
+  }
+
+  async function pickFile(rowId, field) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.onchange = async () => {
+      if (!input.files[0]) return;
+      const fd = new FormData();
+      fd.append("file", input.files[0]);
+      const uploaded = await api(state.urls.upload, { method: "POST", body: fd });
+      const row = state.rows.find((r) => r.id === rowId);
+      const next = [...(row.values[field.id] || []), uploaded];
+      await updateRow(rowId, { [field.id]: next });
+    };
+    input.click();
   }
 
   function openDrawer(rowId) {
@@ -552,6 +634,12 @@
         optionsBox.innerHTML = `<label class="field"><span>Maximum</span><input name="max" type="number" min="1" max="10" value="${current?.options?.max ?? 5}"></label>`;
       } else if (type === "date") {
         optionsBox.innerHTML = `<label class="check"><input type="checkbox" name="include_time" ${current?.options?.include_time ? "checked" : ""}> Include time</label>`;
+      } else if (type === "link_row") {
+        const tables = state.siblingTables || [];
+        const currentId = current?.options?.linked_table_id || "";
+        optionsBox.innerHTML = `<label class="field"><span>Link to table</span>
+          <select name="linked_table_id">${tables.filter((t) => t.id !== state.table.id).map((t) =>
+            `<option value="${t.id}" ${Number(t.id) === Number(currentId) ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>`;
       } else {
         optionsBox.innerHTML = "";
       }
@@ -607,6 +695,8 @@
         payload.options = { max: Number(fd.get("max") || 5), style: "star" };
       } else if (type === "date") {
         payload.options = { include_time: fd.has("include_time"), format: "ISO" };
+      } else if (type === "link_row") {
+        payload.options = { linked_table_id: Number(fd.get("linked_table_id")) };
       }
       if (existing) {
         const updated = await api(`${state.routes.field}/${existing.id}`, { method: "PATCH", body: JSON.stringify(payload) });
@@ -677,7 +767,7 @@
 
   document.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-add-field]");
-    if (t) { fieldModal(); return; }
+    if (t) { if (!readOnly) fieldModal(); return; }
     const fh = e.target.closest("[data-field-menu]");
     if (fh) { fieldModal(fieldById(fh.dataset.fieldMenu)); return; }
     const addRowBtn = e.target.closest("[data-add-row]");
@@ -688,7 +778,7 @@
       return;
     }
     const edit = e.target.closest("[data-edit]");
-    if (edit && !edit.classList.contains("is-editing")) {
+    if (edit && !edit.classList.contains("is-editing") && !e.target.closest("[data-rate]")) {
       const [rowId, fieldId] = edit.dataset.edit.split(":");
       startEdit(Number(rowId), Number(fieldId), edit);
       return;
@@ -768,17 +858,31 @@
       render();
       return;
     }
+    const rate = e.target.closest("[data-rate]");
+    if (rate && !readOnly) {
+      e.preventDefault();
+      e.stopPropagation();
+      const [rowId, fieldId, n] = rate.dataset.rate.split(":");
+      await updateRow(Number(rowId), { [fieldId]: Number(n) });
+      return;
+    }
+    const rowColor = e.target.closest("[data-row-color]");
+    if (rowColor) {
+      state.view.field_options = state.view.field_options || {};
+      state.view.field_options.row_color_field_id = rowColor.dataset.rowColor ? Number(rowColor.dataset.rowColor) : null;
+      await saveView({ field_options: state.view.field_options });
+      window.Baserow.closeMenus();
+      render();
+      return;
+    }
     const share = e.target.closest("[data-share-view]");
     if (share) {
       const updated = await api(state.urls.view, { method: "PATCH", body: JSON.stringify({ public: true }) });
       Object.assign(state.view, updated);
-      const url = `${location.origin}/form/${state.view.public_slug}`;
-      if (state.view.type === "form") {
-        try { await navigator.clipboard.writeText(url); toast("Public form link copied"); } catch (_) { toast(url); }
-        render();
-      } else {
-        toast("Public sharing is available on form views. Duplicate this as a form to share.");
-      }
+      const url = state.view.type === "form"
+        ? `${location.origin}/form/${state.view.public_slug}`
+        : `${location.origin}/shared/${state.view.public_slug}`;
+      try { await navigator.clipboard.writeText(url); toast("Public link copied"); } catch (_) { toast(url); }
       return;
     }
     const saveForm = e.target.closest("[data-save-form]");
@@ -910,9 +1014,49 @@
   });
 
   document.addEventListener("keydown", async (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !readOnly) {
       const add = document.querySelector("[data-add-row]");
-      if (add && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) addRow();
+      if (add && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) addRow();
+    }
+    const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
+    if (!active || typing || state.view.type !== "grid") return;
+    const fields = visibleFields();
+    const rows = state.rows;
+    const rIdx = rows.findIndex((r) => r.id === active.rowId);
+    const fIdx = fields.findIndex((f) => Number(f.id) === Number(active.fieldId));
+    if ((e.metaKey || e.ctrlKey) && e.key === "c") {
+      e.preventDefault();
+      const row = rows[rIdx];
+      const field = fields[fIdx];
+      if (row && field) navigator.clipboard.writeText(display(field, row.values[field.id]));
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === "v" && !readOnly) {
+      e.preventDefault();
+      const text = await navigator.clipboard.readText();
+      const field = fields[fIdx];
+      const row = rows[rIdx];
+      if (field && row && !field.read_only && !["boolean", "file", "link_row", "multiple_select"].includes(field.type)) {
+        await updateRow(row.id, { [field.id]: field.type === "number" || field.type === "rating" ? Number(text) : text });
+      }
+      return;
+    }
+    if (e.key === "Enter" && !readOnly) {
+      const cell = document.querySelector(`[data-edit="${active.rowId}:${active.fieldId}"]`);
+      if (cell) startEdit(active.rowId, active.fieldId, cell);
+      return;
+    }
+    let nr = rIdx;
+    let nf = fIdx;
+    if (e.key === "ArrowDown") nr = Math.min(rows.length - 1, rIdx + 1);
+    else if (e.key === "ArrowUp") nr = Math.max(0, rIdx - 1);
+    else if (e.key === "ArrowRight" || e.key === "Tab") { e.preventDefault(); nf = Math.min(fields.length - 1, fIdx + 1); }
+    else if (e.key === "ArrowLeft") nf = Math.max(0, fIdx - 1);
+    else return;
+    if (rows[nr] && fields[nf]) {
+      active = { rowId: rows[nr].id, fieldId: fields[nf].id };
+      document.querySelectorAll(".cell.is-active").forEach((el) => el.classList.remove("is-active"));
+      document.querySelector(`[data-edit="${active.rowId}:${active.fieldId}"]`)?.classList.add("is-active");
     }
   });
 

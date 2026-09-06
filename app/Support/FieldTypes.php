@@ -21,6 +21,8 @@ class FieldTypes
             'url' => ['label' => 'URL', 'icon' => 'url', 'group' => 'text'],
             'email' => ['label' => 'Email', 'icon' => 'email', 'group' => 'text'],
             'phone' => ['label' => 'Phone number', 'icon' => 'phone', 'group' => 'text'],
+            'link_row' => ['label' => 'Link to table', 'icon' => 'link', 'group' => 'link'],
+            'file' => ['label' => 'File', 'icon' => 'file', 'group' => 'text'],
             'created_on' => ['label' => 'Created on', 'icon' => 'created', 'group' => 'system'],
             'last_modified' => ['label' => 'Last modified', 'icon' => 'modified', 'group' => 'system'],
         ];
@@ -41,7 +43,7 @@ class FieldTypes
         return match ($type) {
             'boolean' => false,
             'number', 'rating' => null,
-            'multiple_select' => [],
+            'multiple_select', 'link_row', 'file' => [],
             default => null,
         };
     }
@@ -53,6 +55,7 @@ class FieldTypes
             'date' => ['include_time' => false, 'format' => 'ISO'],
             'rating' => ['max' => 5, 'style' => 'star'],
             'single_select', 'multiple_select' => ['options' => []],
+            'link_row' => ['linked_table_id' => null],
             default => [],
         };
     }
@@ -96,7 +99,7 @@ class FieldTypes
                 'empty' => 'is empty',
                 'not_empty' => 'is not empty',
             ],
-            'multiple_select' => [
+            'multiple_select', 'link_row' => [
                 'contains' => 'contains',
                 'not_contains' => 'does not contain',
                 'empty' => 'is empty',
@@ -135,7 +138,7 @@ class FieldTypes
             return true;
         }
 
-        if ($type === 'multiple_select' && is_array($value) && $value === []) {
+        if (in_array($type, ['multiple_select', 'link_row', 'file'], true) && is_array($value) && $value === []) {
             return true;
         }
 

@@ -152,6 +152,15 @@
                 @endforeach
             </div>
             @endif
+            <button type="button" class="tool" data-menu="color-menu">
+                @include('partials.icon', ['name' => 'color']) Color
+            </button>
+            <div class="menu" id="color-menu" hidden>
+                <button type="button" data-row-color="">No coloring</button>
+                @foreach ($table->fields->where('type', 'single_select') as $colorField)
+                    <button type="button" data-row-color="{{ $colorField->id }}">{{ $colorField->name }}</button>
+                @endforeach
+            </div>
             <button type="button" class="tool" data-menu="share-menu">
                 @include('partials.icon', ['name' => 'share']) Share
             </button>

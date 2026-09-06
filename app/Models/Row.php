@@ -50,7 +50,8 @@ class Row extends Model
         return match ($field->type) {
             'boolean' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
             'number', 'rating' => $value === '' || $value === null ? null : (is_numeric($value) ? 0 + $value : null),
-            'multiple_select' => array_values(array_filter((array) $value, fn ($v) => $v !== null && $v !== '')),
+            'multiple_select', 'link_row' => array_values(array_filter((array) $value, fn ($v) => $v !== null && $v !== '')),
+            'file' => array_values(array_filter((array) $value, fn ($v) => is_array($v) && ! empty($v['url']))),
             'single_select' => $value === '' ? null : $value,
             default => $value === '' ? null : $value,
         };

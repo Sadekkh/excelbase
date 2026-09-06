@@ -134,6 +134,27 @@ class BaserowTest extends TestCase
         }
     }
 
+    public function test_deals_link_to_clients_and_public_share(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $user = User::query()->where('email', 'demo@baserow.io')->first();
+        $table = Table::query()->where('name', 'Deals')->first();
+        $clientField = $table->fields()->where('type', 'link_row')->first();
+        $this->assertNotNull($clientField);
+        $this->assertNotNull($clientField->options['linked_table_id']);
+
+        $view = $table->views()->where('type', 'grid')->first();
+        $this->actingAs($user)->patchJson(route('views.update', $view), [
+            'public' => true,
+        ])->assertOk();
+
+        $view->refresh();
+        $this->get(route('views.shared', $view->public_slug))
+            ->assertOk()
+            ->assertSee('Shared view')
+            ->assertSee('Deals');
+    }
+
     public function test_database_creates_default_table(): void
     {
         $user = User::factory()->create();
