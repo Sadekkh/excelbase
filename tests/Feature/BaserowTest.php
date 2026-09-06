@@ -214,12 +214,13 @@ class BaserowTest extends TestCase
             ->assertJsonPath('bootstrap.canBuild', true);
 
         Storage::fake('public');
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
         $this->actingAs($owner)->post(route('workspaces.look', $sales), [
             'name' => 'Sales',
             'tagline' => 'Repainted for the sales pod',
             'brand_color' => '#c45c26',
             'sidebar_color' => '#fff7f0',
-            'logo' => UploadedFile::fake()->image('sales-mark.png', 64, 64),
+            'logo' => UploadedFile::fake()->createWithContent('sales-mark.png', $png),
         ], ['Accept' => 'application/json'])
             ->assertOk()
             ->assertJsonPath('workspace.brand_color', '#c45c26')
