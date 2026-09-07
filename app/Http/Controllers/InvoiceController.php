@@ -82,12 +82,40 @@ class InvoiceController extends Controller
             'default_vat' => ['nullable', 'numeric'],
             'payment_days' => ['nullable', 'integer', 'min:0', 'max:120'],
             'number_prefix' => ['nullable', 'string', 'max:8'],
+            'template_title' => ['nullable', 'string', 'max:80'],
+            'template_accent' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'template_intro' => ['nullable', 'string', 'max:800'],
+            'template_footer' => ['nullable', 'string', 'max:800'],
+            'template_legal' => ['nullable', 'string', 'max:1200'],
+            'template_show_logo' => ['nullable', 'boolean'],
+            'template_show_due_date' => ['nullable', 'boolean'],
         ]);
         $settings = InvoiceSetting::for($workspace);
-        $settings->fill($data);
+        $settings->fill(collect($data)->except([
+            'default_vat', 'franchise_tva',
+            'template_title', 'template_accent', 'template_intro', 'template_footer',
+            'template_legal', 'template_show_logo', 'template_show_due_date',
+        ])->all());
+        if ($request->exists('franchise_tva')) {
+            $settings->franchise_tva = $request->boolean('franchise_tva');
+        }
         if (isset($data['default_vat'])) {
             $settings->default_vat = (int) round(((float) $data['default_vat']) * 100);
         }
+        $current = $settings->resolvedTemplate();
+        $settings->template = [
+            'title' => $data['template_title'] ?? $current['title'],
+            'accent' => $data['template_accent'] ?? $current['accent'],
+            'intro' => $data['template_intro'] ?? $current['intro'],
+            'footer' => $data['template_footer'] ?? $current['footer'],
+            'legal' => $data['template_legal'] ?? $current['legal'],
+            'show_logo' => $request->exists('template_show_logo')
+                ? $request->boolean('template_show_logo')
+                : $current['show_logo'],
+            'show_due_date' => $request->exists('template_show_due_date')
+                ? $request->boolean('template_show_due_date')
+                : $current['show_due_date'],
+        ];
         $settings->save();
 
         return response()->json(['ok' => true, 'status' => 'Paramètres de facturation enregistrés.', 'settings' => $this->settingsPayload($settings)]);
@@ -103,7 +131,7 @@ class InvoiceController extends Controller
         return view('invoices.print', [
             'invoice' => $invoice,
             'settings' => $settings,
-        ]);
+        ])->header('Cache-Control', 'no-store');
     }
 
     /**
@@ -148,6 +176,8 @@ class InvoiceController extends Controller
             'number_prefix' => $settings->number_prefix,
             'next_number' => $settings->next_number,
             'client_table_id' => $settings->client_table_id,
+            'vat_rate' => $settings->vatRatePercent(),
+            'template' => $settings->resolvedTemplate(),
         ];
     }
 

@@ -271,6 +271,12 @@ class TemplateInstaller
             'number_prefix' => $invoice['prefix'] ?? $settings->number_prefix,
             'client_table_id' => isset($invoice['clients'], $tables[$invoice['clients']]) ? $tables[$invoice['clients']]->id : $settings->client_table_id,
         ]);
+        $tpl = $settings->resolvedTemplate();
+        $tpl['accent'] = $pack['look']['brand_color'] ?? $tpl['accent'];
+        if (! empty($invoice['title'])) {
+            $tpl['title'] = (string) $invoice['title'];
+        }
+        $settings->template = $tpl;
         $settings->save();
 
         if (! empty($pack['look'])) {

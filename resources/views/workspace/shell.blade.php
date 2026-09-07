@@ -92,6 +92,6 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/table.js') }}?v=erp-1"></script>
-<script src="{{ asset('js/shell.js') }}?v=erp-1"></script>
+<script src="{{ asset('js/table.js') }}?v=erp-2"></script>
+<script src="{{ asset('js/shell.js') }}?v=erp-2"></script>
 @endpush

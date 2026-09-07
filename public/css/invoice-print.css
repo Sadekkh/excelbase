@@ -1,0 +1,202 @@
+/* Isolated invoice document — do not load the app shell CSS here.
+   html/body height:100% and overflow:hidden in the app stylesheet clip print output. */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+html, body.invoice-print-body {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  margin: 0;
+  background: #f3f3f4;
+  color: #202128;
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.invoice-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e6e6e7;
+}
+
+.invoice-toolbar p {
+  margin: 4px 0 0;
+  color: #515258;
+  font-size: 12px;
+}
+
+.invoice-toolbar__print {
+  appearance: none;
+  border: 0;
+  background: #202128;
+  color: #fff;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.invoice-sheet {
+  --invoice-accent: #5190ef;
+  width: min(800px, calc(100% - 32px));
+  margin: 20px auto 40px;
+  background: #fff;
+  padding: 0 36px 36px;
+  border: 1px solid #e6e6e7;
+  box-shadow: 0 8px 24px rgba(7, 8, 16, 0.08);
+}
+
+.invoice-sheet__bar {
+  height: 8px;
+  margin: 0 -36px 28px;
+  background: var(--invoice-accent);
+}
+
+.invoice-sheet__head,
+.invoice-sheet__client {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.invoice-sheet__logo {
+  display: block;
+  max-height: 56px;
+  max-width: 180px;
+  margin-bottom: 12px;
+  object-fit: contain;
+}
+
+.invoice-sheet h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+  color: var(--invoice-accent);
+}
+
+.invoice-sheet h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6a6b70;
+}
+
+.invoice-sheet__number {
+  font-weight: 700;
+  font-size: 18px;
+  margin: 4px 0;
+}
+
+.invoice-sheet__seller,
+.invoice-sheet__client {
+  max-width: 48%;
+}
+
+.invoice-sheet__seller {
+  text-align: right;
+}
+
+.invoice-sheet p {
+  margin: 0 0 4px;
+}
+
+.invoice-sheet__intro,
+.invoice-sheet__footer,
+.invoice-sheet__notes {
+  margin: 0 0 20px;
+  white-space: pre-wrap;
+}
+
+.invoice-sheet__lines {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 24px;
+}
+
+.invoice-sheet__lines th,
+.invoice-sheet__lines td {
+  border-bottom: 1px solid #e6e6e7;
+  text-align: left;
+  padding: 8px 6px;
+  vertical-align: top;
+}
+
+.invoice-sheet__lines th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6a6b70;
+}
+
+.invoice-sheet__lines .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.invoice-sheet__totals {
+  margin-left: auto;
+  width: min(320px, 100%);
+}
+
+.invoice-sheet__totals p {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  padding: 6px 0;
+  border-bottom: 1px solid #e6e6e7;
+}
+
+.invoice-sheet__ttc {
+  font-size: 18px;
+  border-bottom: 0 !important;
+  color: var(--invoice-accent);
+}
+
+.invoice-sheet__legal {
+  margin-top: 32px;
+  color: #515258;
+  font-size: 11px;
+}
+
+.invoice-sheet__legal p {
+  margin: 0 0 8px;
+}
+
+@media print {
+  html, body.invoice-print-body {
+    background: #fff;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .invoice-toolbar {
+    display: none !important;
+  }
+
+  .invoice-sheet {
+    border: 0;
+    box-shadow: none;
+    margin: 0;
+    width: 100%;
+    padding: 0;
+  }
+
+  .invoice-sheet__bar {
+    margin: 0 0 20px;
+  }
+}

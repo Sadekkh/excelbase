@@ -10,18 +10,20 @@ use Illuminate\Support\Carbon;
 class InvoiceService
 {
     /**
+     * Line tax always comes from invoice settings (franchise → 0).
+     *
      * @param  list<array{description?: string, qty?: float|int|string, unit_price?: float|int|string, vat?: float|int|string}>  $lines
      * @return array{lines: list<array<string, mixed>>, total_ht: int, total_tva: int, total_ttc: int}
      */
-    public static function totals(array $lines, bool $franchise = false): array
+    public static function totals(array $lines, InvoiceSetting $settings): array
     {
         $normalized = [];
         $ht = 0;
         $tva = 0;
+        $vatBps = $settings->vatRateBps();
         foreach ($lines as $line) {
             $qty = (float) str_replace(',', '.', (string) ($line['qty'] ?? 1));
             $unit = Money::fromDecimal($line['unit_price'] ?? 0);
-            $vatBps = $franchise ? 0 : (int) round(((float) str_replace(',', '.', (string) ($line['vat'] ?? 20))) * 100);
             $lineHt = (int) round($qty * $unit);
             $lineTva = (int) round($lineHt * $vatBps / 10000);
             $ht += $lineHt;
@@ -51,8 +53,7 @@ class InvoiceService
     public static function save(Workspace $workspace, array $payload, ?Invoice $invoice = null): Invoice
     {
         $settings = InvoiceSetting::for($workspace);
-        $franchise = (bool) $settings->franchise_tva;
-        $computed = self::totals($payload['lines'] ?? [], $franchise);
+        $computed = self::totals($payload['lines'] ?? [], $settings);
         $invoice ??= new Invoice(['workspace_id' => $workspace->id]);
         $issued = in_array($invoice->status, ['issued', 'paid'], true);
         $invoice->fill([
@@ -143,14 +144,22 @@ class InvoiceService
                 'unit_price' => ($line['unit_price'] ?? 0) / 100,
                 'vat' => ($line['vat'] ?? 0) / 100,
                 'ht' => Money::format((int) ($line['ht'] ?? 0)),
+                'tva' => Money::format((int) ($line['tva'] ?? 0)),
                 'ttc' => Money::format((int) ($line['ttc'] ?? 0)),
+                'subtotal' => Money::format((int) ($line['ht'] ?? 0)),
+                'tax' => Money::format((int) ($line['tva'] ?? 0)),
+                'total' => Money::format((int) ($line['ttc'] ?? 0)),
             ])->all(),
             'total_ht' => $invoice->cents('total_ht'),
             'total_tva' => $invoice->cents('total_tva'),
             'total_ttc' => $invoice->cents('total_ttc'),
+            'subtotal' => $invoice->cents('total_ht'),
+            'tax' => $invoice->cents('total_tva'),
+            'total' => $invoice->cents('total_ttc'),
             'notes' => $invoice->notes,
-            'print_url' => route('invoices.print', $invoice),
+            'print_url' => route('app.invoices.print', $invoice),
             'franchise_tva' => (bool) $settings->franchise_tva,
+            'vat_rate' => $settings->vatRatePercent(),
         ];
     }
 }

@@ -503,7 +503,12 @@ class BaserowTest extends TestCase
             ->assertOk()
             ->assertSee('Facture')
             ->assertSee('Hôtel des Archives')
-            ->assertSee('SIRET');
+            ->assertSee('SIRET')
+            ->assertSee('Sous-total')
+            ->assertSee('Taxe')
+            ->assertSee('Total TTC')
+            ->assertSee('Print / Save as PDF')
+            ->assertDontSee('baserow.css');
 
         $ops = Workspace::createForUser($owner, 'Atelier test');
         $this->actingAs($owner)->withSession(['workspace_id' => $ops->id])
@@ -548,5 +553,68 @@ class BaserowTest extends TestCase
             ->assertOk();
         $this->assertTrue($ops->fresh()->databases()->where('name', 'table livraisons et table chauffeurs')->exists()
             || $ops->fresh()->databases()->count() >= 1);
+    }
+
+    public function test_invoice_lines_use_settings_tax_and_printable_template(): void
+    {
+        $this->seed(DemoSeeder::class);
+        $owner = User::query()->where('email', 'demo@baserow.io')->first();
+        $workspace = Workspace::createForUser($owner, 'Cabinet Nord');
+
+        $this->actingAs($owner)->withSession(['workspace_id' => $workspace->id])
+            ->postJson(route('app.invoices.settings'), [
+                'legal_name' => 'Cabinet Nord',
+                'franchise_tva' => false,
+                'default_vat' => 10,
+                'template_title' => 'Note d’honoraires',
+                'template_accent' => '#112233',
+                'template_intro' => 'Merci pour votre confiance.',
+                'template_footer' => 'Payable par virement.',
+                'template_legal' => 'Mentions custom.',
+                'template_show_logo' => false,
+                'template_show_due_date' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('settings.default_vat', 10)
+            ->assertJsonPath('settings.template.title', 'Note d’honoraires')
+            ->assertJsonPath('settings.template.accent', '#112233')
+            ->assertJsonPath('settings.template.show_due_date', false);
+
+        $create = $this->actingAs($owner)->withSession(['workspace_id' => $workspace->id])
+            ->postJson(route('app.invoices.store'), [
+                'client_name' => 'Northwind Labs',
+                'lines' => [
+                    ['description' => 'Audit', 'qty' => 1, 'unit_price' => 100, 'vat' => 20],
+                    ['description' => 'Accompagnement', 'qty' => 2, 'unit_price' => 50],
+                ],
+                'issue' => true,
+            ]);
+        $create->assertCreated();
+        $this->assertSame('100,00 €', $create->json('invoice.lines.0.subtotal'));
+        $this->assertSame('10,00 €', $create->json('invoice.lines.0.tax'));
+        $this->assertSame('110,00 €', $create->json('invoice.lines.0.total'));
+        $this->assertSame('100,00 €', $create->json('invoice.lines.1.subtotal'));
+        $this->assertSame('10,00 €', $create->json('invoice.lines.1.tax'));
+        $this->assertSame('110,00 €', $create->json('invoice.lines.1.total'));
+        $this->assertSame('200,00 €', $create->json('invoice.subtotal'));
+        $this->assertSame('20,00 €', $create->json('invoice.tax'));
+        $this->assertSame('220,00 €', $create->json('invoice.total'));
+        $this->assertEquals(10, $create->json('invoice.vat_rate'));
+
+        $invoice = \App\Models\Invoice::query()->where('workspace_id', $workspace->id)->first();
+        $print = $this->actingAs($owner)->withSession(['workspace_id' => $workspace->id])
+            ->get(route('app.invoices.print', $invoice));
+        $print->assertOk()
+            ->assertSee('Note d’honoraires')
+            ->assertSee('Merci pour votre confiance.')
+            ->assertSee('Payable par virement.')
+            ->assertSee('Mentions custom.')
+            ->assertSee('Sous-total')
+            ->assertSee('Taxe')
+            ->assertSee('Total TTC')
+            ->assertSee('Print / Save as PDF')
+            ->assertDontSee('Échéance')
+            ->assertDontSee('baserow.css')
+            ->assertSee('#112233');
     }
 }

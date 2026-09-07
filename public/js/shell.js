@@ -13,6 +13,7 @@
   let current = { kind: null, tableId: null, viewId: null, dashboardId: null, search: "" };
   let searchTimer = null;
   let assistantPlan = null;
+  let invoiceUi = { settings: {} };
 
   const ICONS = {
     table: "M3.5 5h17v14h-17zM3.5 9.5h17M9 5v14",
@@ -520,11 +521,138 @@
     </article>`;
   }
 
+  function euro(amount) {
+    const n = Number.isFinite(amount) ? amount : 0;
+    const sign = n < 0 ? "-" : "";
+    return `${sign}${Math.abs(n).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  }
+
+  function invoiceVatRate(settings) {
+    if (settings?.franchise_tva) return 0;
+    const rate = Number(settings?.default_vat ?? settings?.vat_rate ?? 20);
+    return Number.isFinite(rate) ? rate : 20;
+  }
+
+  function invoiceLineAmounts(qty, unit, rate) {
+    const ht = (Number(qty) || 0) * (Number(unit) || 0);
+    const tax = ht * (Number(rate) || 0) / 100;
+    return { ht, tax, total: ht + tax };
+  }
+
+  function invoiceLineRowHtml(settings) {
+    const rate = invoiceVatRate(settings);
+    const vatLabel = settings?.franchise_tva ? "0 % · art. 293 B" : `${String(rate).replace(".", ",")} %`;
+    return `<div class="invoice-line" data-invoice-line>
+      <div class="invoice-line__grid">
+        <label class="field"><span>Désignation</span><input data-line="description" placeholder="Prestation, produit…"></label>
+        <label class="field"><span>Qté</span><input data-line="qty" type="number" min="0" step="0.01" value="1"></label>
+        <label class="field"><span>PU HT</span><input data-line="unit_price" type="number" step="0.01"></label>
+        <button type="button" class="icon-btn" data-remove-invoice-line aria-label="Remove line">${icon("x", 14)}</button>
+      </div>
+      <div class="invoice-line__amounts">
+        <span>TVA<strong data-line-vat>${esc(vatLabel)}</strong></span>
+        <span>Sous-total<strong data-line-subtotal>0,00 €</strong></span>
+        <span>Taxe<strong data-line-tax>0,00 €</strong></span>
+        <span>Total<strong data-line-total>0,00 €</strong></span>
+      </div>
+    </div>`;
+  }
+
+  function refreshInvoiceLineTotals(settings) {
+    const rate = invoiceVatRate(settings);
+    let subtotal = 0;
+    let tax = 0;
+    document.querySelectorAll("[data-invoice-line]").forEach((row) => {
+      const qty = parseFloat(String(row.querySelector('[data-line="qty"]')?.value || "0").replace(",", ".")) || 0;
+      const unit = parseFloat(String(row.querySelector('[data-line="unit_price"]')?.value || "0").replace(",", ".")) || 0;
+      const amounts = invoiceLineAmounts(qty, unit, rate);
+      subtotal += amounts.ht;
+      tax += amounts.tax;
+      const subEl = row.querySelector("[data-line-subtotal]");
+      const taxEl = row.querySelector("[data-line-tax]");
+      const totEl = row.querySelector("[data-line-total]");
+      if (subEl) subEl.textContent = euro(amounts.ht);
+      if (taxEl) taxEl.textContent = euro(amounts.tax);
+      if (totEl) totEl.textContent = euro(amounts.total);
+    });
+    const liveSub = document.querySelector("[data-inv-subtotal]");
+    const liveTax = document.querySelector("[data-inv-tax]");
+    const liveTot = document.querySelector("[data-inv-total]");
+    if (liveSub) liveSub.textContent = euro(subtotal);
+    if (liveTax) liveTax.textContent = euro(tax);
+    if (liveTot) liveTot.textContent = euro(subtotal + tax);
+  }
+
+  function collectInvoiceLines() {
+    return [...document.querySelectorAll("[data-invoice-line]")].map((row) => ({
+      description: row.querySelector('[data-line="description"]')?.value || "",
+      qty: row.querySelector('[data-line="qty"]')?.value || "0",
+      unit_price: row.querySelector('[data-line="unit_price"]')?.value || "0",
+    })).filter((line) => line.description.trim());
+  }
+
+  function closeInvoicePreview() {
+    const overlay = document.getElementById("invoice-preview");
+    if (!overlay) return;
+    overlay.hidden = true;
+    const frame = overlay.querySelector("iframe");
+    if (frame) frame.src = "about:blank";
+  }
+
+  function invoicePreviewEl() {
+    let el = document.getElementById("invoice-preview");
+    if (el) return el;
+    el = document.createElement("div");
+    el.id = "invoice-preview";
+    el.className = "invoice-preview";
+    el.hidden = true;
+    el.innerHTML = `<div class="invoice-preview__panel" role="dialog" aria-label="Invoice preview">
+      <header class="invoice-preview__bar">
+        <div>
+          <strong>Invoice preview</strong>
+          <p class="hint" style="margin:4px 0 0">Print or choose Save as PDF in the browser dialog. The app stays on this page.</p>
+        </div>
+        <div class="invoice-preview__actions">
+          <button type="button" class="btn btn--primary" data-invoice-print>Print / Save as PDF</button>
+          <button type="button" class="btn btn--ghost" data-invoice-close>Close</button>
+        </div>
+      </header>
+      <iframe class="invoice-preview__frame" title="Invoice document"></iframe>
+    </div>`;
+    document.body.appendChild(el);
+    el.querySelector("[data-invoice-close]").addEventListener("click", closeInvoicePreview);
+    el.addEventListener("click", (e) => { if (e.target === el) closeInvoicePreview(); });
+    el.querySelector("[data-invoice-print]").addEventListener("click", () => {
+      const frame = el.querySelector("iframe");
+      const win = frame?.contentWindow;
+      if (!win || !frame.src || frame.src === "about:blank") {
+        toast("Wait for the preview to load.");
+        return;
+      }
+      try {
+        win.focus();
+        win.print();
+      } catch (err) {
+        toast("Could not open the print dialog.");
+      }
+    });
+    return el;
+  }
+
+  function openInvoicePreview(url) {
+    const overlay = invoicePreviewEl();
+    const frame = overlay.querySelector("iframe");
+    overlay.hidden = false;
+    frame.src = url;
+  }
+
   function renderInvoices(data) {
     const settings = data.settings || {};
+    const tpl = settings.template || {};
+    invoiceUi.settings = settings;
     renderPageChrome("Invoices", settings.franchise_tva
-      ? "Franchise en base de TVA — mention 293 B on every issued invoice."
-      : "French invoicing: sequential numbers, TVA lines, late-payment mentions.");
+      ? "Franchise en base de TVA — mention 293 B on every issued invoice. Tax on each line is 0 %."
+      : `French invoicing. Tax on every line uses the rate in settings (${esc(settings.default_vat ?? 20)} %).`);
     const rows = (data.invoices || []).map((inv) => `
       <tr>
         <td>${esc(inv.number || "Brouillon")}</td>
@@ -534,25 +662,37 @@
         <td class="invoice-actions">
           ${inv.status === "draft" ? `<button type="button" class="btn btn--ghost" data-invoice-action="issue" data-id="${inv.id}">Issue</button>` : ""}
           ${inv.status === "issued" ? `<button type="button" class="btn btn--ghost" data-invoice-action="pay" data-id="${inv.id}">Mark paid</button>` : ""}
-          <a class="btn btn--ghost" href="${esc(inv.print_url)}" target="_blank" rel="noopener">Print</a>
+          <button type="button" class="btn btn--ghost" data-invoice-preview="${esc(inv.print_url)}">Print / PDF</button>
         </td>
       </tr>
     `).join("") || `<tr><td colspan="5" class="hint">No invoices yet.</td></tr>`;
     const clientOpts = (data.clients || []).map((c) => `<option value="${c.id}" data-email="${esc(c.email || "")}" data-address="${esc(c.address || "")}" data-siret="${esc(c.siret || "")}">${esc(c.name)}</option>`).join("");
-    stage.innerHTML = `<div class="page-body"><div class="split">
+    const accent = /^#[0-9A-Fa-f]{6}$/.test(tpl.accent || "") ? tpl.accent : "#5190ef";
+    stage.innerHTML = `<div class="page-body invoices-layout">
+      <table class="data-table">
+        <thead><tr><th>N°</th><th>Client</th><th>Statut</th><th>TTC</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="split">
       <div>
-        <table class="data-table">
-          <thead><tr><th>N°</th><th>Client</th><th>Statut</th><th>TTC</th><th></th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        ${boot.can_build ? `<form class="side-card" id="invoice-settings" style="margin-top:16px">
-          <h2>Company on the invoice</h2>
+        ${boot.can_build ? `<form class="side-card" id="invoice-settings">
+          <h2>Company and tax</h2>
+          <p class="hint">The tax rate below is applied to every invoice line. Issued documents keep the amounts stored at the time.</p>
           <label class="field"><span>Raison sociale</span><input name="legal_name" required value="${esc(settings.legal_name || boot.workspace.name)}"></label>
           <label class="field"><span>Adresse</span><textarea name="address" rows="3">${esc(settings.address || "")}</textarea></label>
           <label class="field"><span>SIRET</span><input name="siret" value="${esc(settings.siret || "")}"></label>
           <label class="field"><span>N° TVA</span><input name="tva_number" value="${esc(settings.tva_number || "")}"></label>
           <label class="check"><input type="checkbox" name="franchise_tva" value="1" ${settings.franchise_tva ? "checked" : ""}> Franchise en base de TVA (art. 293 B)</label>
-          <label class="field"><span>TVA par défaut %</span><input name="default_vat" type="number" step="0.1" value="${esc(settings.default_vat ?? 20)}"></label>
+          <label class="field"><span>TVA %</span><input name="default_vat" type="number" step="0.1" min="0" value="${esc(settings.default_vat ?? 20)}"></label>
+          <h2 style="margin-top:18px">Invoice template</h2>
+          <p class="hint">Title, accent, intro, footer and legal mentions appear on Print / Save as PDF.</p>
+          <label class="field"><span>Document title</span><input name="template_title" maxlength="80" value="${esc(tpl.title || "Facture")}"></label>
+          <label class="field"><span>Accent</span><input type="color" name="template_accent" value="${esc(accent)}"></label>
+          <label class="field"><span>Intro</span><textarea name="template_intro" rows="2" placeholder="Shown under the header">${esc(tpl.intro || "")}</textarea></label>
+          <label class="field"><span>Footer</span><textarea name="template_footer" rows="2" placeholder="Shown above the legal block">${esc(tpl.footer || "")}</textarea></label>
+          <label class="field"><span>Legal mentions</span><textarea name="template_legal" rows="3" placeholder="Extra mentions on the printed document">${esc(tpl.legal || "")}</textarea></label>
+          <label class="check"><input type="checkbox" name="template_show_logo" value="1" ${tpl.show_logo !== false ? "checked" : ""}> Show workspace logo</label>
+          <label class="check"><input type="checkbox" name="template_show_due_date" value="1" ${tpl.show_due_date !== false ? "checked" : ""}> Show due date</label>
           <button class="btn btn--primary" type="submit">Save invoice settings</button>
         </form>` : ""}
       </div>
@@ -565,13 +705,13 @@
         <label class="field"><span>Adresse</span><textarea name="client_address" rows="2"></textarea></label>
         <label class="field"><span>Email</span><input name="client_email" type="email"></label>
         <label class="field"><span>SIRET</span><input name="client_siret"></label>
-        <div id="invoice-lines">
-          <label class="field"><span>Line 1</span><input data-line="description" placeholder="Désignation" required></label>
-          <div class="look-swatches">
-            <label class="field"><span>Qté</span><input data-line="qty" type="number" step="0.01" value="1"></label>
-            <label class="field"><span>PU HT</span><input data-line="unit_price" type="number" step="0.01" required></label>
-            <label class="field"><span>TVA %</span><input data-line="vat" type="number" step="0.1" value="${esc(settings.default_vat ?? 20)}"></label>
-          </div>
+        <p class="hint">TVA on each line comes from settings${settings.franchise_tva ? " (franchise, 0 %)" : ` (${esc(settings.default_vat ?? 20)} %)`}. Add as many lines as you need.</p>
+        <div class="invoice-lines" id="invoice-lines">${invoiceLineRowHtml(settings)}</div>
+        <button type="button" class="btn btn--ghost" data-add-invoice-line>Add line</button>
+        <div class="invoice-totals-live">
+          <span>Sous-total HT<strong data-inv-subtotal>0,00 €</strong></span>
+          <span>Taxe<strong data-inv-tax>0,00 €</strong></span>
+          <span>Total TTC<strong data-inv-total>0,00 €</strong></span>
         </div>
         <label class="field"><span>Notes</span><textarea name="notes" rows="2"></textarea></label>
         <button class="btn btn--primary" type="submit">Save draft</button>
@@ -588,6 +728,7 @@
       form.client_address.value = opt.dataset.address || "";
       form.client_siret.value = opt.dataset.siret || "";
     });
+    refreshInvoiceLineTotals(settings);
   }
 
   function renderLook() {
@@ -995,6 +1136,36 @@
       }
       return;
     }
+    const previewInv = e.target.closest("[data-invoice-preview]");
+    if (previewInv) {
+      openInvoicePreview(previewInv.dataset.invoicePreview);
+      return;
+    }
+    const addLine = e.target.closest("[data-add-invoice-line]");
+    if (addLine) {
+      const wrap = document.getElementById("invoice-lines");
+      if (wrap) {
+        wrap.insertAdjacentHTML("beforeend", invoiceLineRowHtml(invoiceUi.settings));
+        refreshInvoiceLineTotals(invoiceUi.settings);
+      }
+      return;
+    }
+    const removeLine = e.target.closest("[data-remove-invoice-line]");
+    if (removeLine) {
+      const wrap = document.getElementById("invoice-lines");
+      const row = removeLine.closest("[data-invoice-line]");
+      if (wrap && row) {
+        if (wrap.querySelectorAll("[data-invoice-line]").length === 1) {
+          row.querySelector('[data-line="description"]').value = "";
+          row.querySelector('[data-line="qty"]').value = "1";
+          row.querySelector('[data-line="unit_price"]').value = "";
+        } else {
+          row.remove();
+        }
+        refreshInvoiceLineTotals(invoiceUi.settings);
+      }
+      return;
+    }
     const applyAi = e.target.closest("[data-apply-assistant]");
     if (applyAi && assistantPlan) {
       try {
@@ -1019,6 +1190,18 @@
       } catch (err) {
         toast(err.message);
       }
+    }
+  });
+
+  document.addEventListener("input", (e) => {
+    if (e.target.closest("[data-invoice-line]")) {
+      refreshInvoiceLineTotals(invoiceUi.settings);
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.getElementById("invoice-preview") && !document.getElementById("invoice-preview").hidden) {
+      closeInvoicePreview();
     }
   });
 
@@ -1081,12 +1264,11 @@
     if (invoiceForm) {
       e.preventDefault();
       const issue = e.submitter?.name === "issue";
-      const lines = [{
-        description: invoiceForm.querySelector('[data-line="description"]').value,
-        qty: invoiceForm.querySelector('[data-line="qty"]').value,
-        unit_price: invoiceForm.querySelector('[data-line="unit_price"]').value,
-        vat: invoiceForm.querySelector('[data-line="vat"]').value,
-      }];
+      const lines = collectInvoiceLines();
+      if (!lines.length) {
+        toast("Add at least one line with a description.");
+        return;
+      }
       try {
         const res = await api(boot.urls.invoiceStore, {
           method: "POST",
@@ -1122,6 +1304,13 @@
             tva_number: fd.get("tva_number"),
             franchise_tva: fd.get("franchise_tva") === "1",
             default_vat: fd.get("default_vat"),
+            template_title: fd.get("template_title"),
+            template_accent: fd.get("template_accent"),
+            template_intro: fd.get("template_intro"),
+            template_footer: fd.get("template_footer"),
+            template_legal: fd.get("template_legal"),
+            template_show_logo: fd.get("template_show_logo") === "1",
+            template_show_due_date: fd.get("template_show_due_date") === "1",
           }),
         });
         toast(res.status || "Saved");

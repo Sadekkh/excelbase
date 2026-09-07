@@ -65,6 +65,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/app/invoices', [InvoiceController::class, 'store'])->name('app.invoices.store');
     Route::patch('/app/invoices/{invoice}', [InvoiceController::class, 'update'])->name('app.invoices.update');
     Route::post('/app/invoices/settings', [InvoiceController::class, 'settings'])->name('app.invoices.settings');
+    Route::get('/app/invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('app.invoices.print');
     Route::get('/invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
 
     Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');

@@ -2,7 +2,7 @@
 
 A Laravel + Blade SaaS recreation of [Baserow](https://baserow.io). No Vue, React, Alpine, or Livewire. Each **client is a workspace** on a **plan**, with **roles**, a **platform admin**, **dashboards**, and **automations**.
 
-The app stays on `/app`. Each workspace is its own unit: tables, roles, permissions, Build mode, and look. You can install a French SME template (boulangerie, bâtiment, coffee shop, auto-entrepreneur), remove it, then keep adjusting the tables in Build. Invoices are a first-class French module (SIRET, TVA or art. 293 B, sequential numbers, print).
+The app stays on `/app`. Each workspace is its own unit: tables, roles, permissions, Build mode, and look. You can install a French SME template (boulangerie, bâtiment, coffee shop, auto-entrepreneur), remove it, then keep adjusting the tables in Build. Invoices are a first-class French module: SIRET, sequential numbers, line **subtotal / tax / total**, TVA from workspace settings (or art. 293 B), an adjustable print template, and **Print / Save as PDF** in the browser (no popup).
 
 A copy of the pre-ERP shell is tagged `snapshot-pre-erp`.
 
