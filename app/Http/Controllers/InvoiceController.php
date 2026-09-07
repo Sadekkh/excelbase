@@ -128,10 +128,12 @@ class InvoiceController extends Controller
 
         $invoice->load('workspace');
 
-        return view('invoices.print', [
-            'invoice' => $invoice,
-            'settings' => $settings,
-        ])->header('Cache-Control', 'no-store');
+        return response()
+            ->view('invoices.print', [
+                'invoice' => $invoice,
+                'settings' => $settings,
+            ])
+            ->header('Cache-Control', 'no-store');
     }
 
     /**
